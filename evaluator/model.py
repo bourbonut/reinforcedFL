@@ -1,5 +1,6 @@
 # https://towardsdatascience.com/learning-reinforcement-learning-reinforce-with-pytorch-5e8ad7fc7da0
 
+import torch
 from torch import nn
 from torch.nn import functional as F
 
