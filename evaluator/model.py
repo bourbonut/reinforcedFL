@@ -3,6 +3,8 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch import optim
+import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -12,13 +14,14 @@ class Estimator(nn.Module):
     NHIDDEN = 128
 
     def __init__(self, ninput, noutput):
+        super(Estimator, self).__init__()
         self.input = nn.Linear(ninput, self.NHIDDEN)
         self.output = nn.Linear(self.NHIDDEN, noutput)
 
     def forward(self, x):
         x = x.to(device)
         x = F.relu(self.input(x))
-        return F.softmax(self.output(x))
+        return F.softmax(self.output(x), dim=-1)
 
 
 def discount_rewards(rewards, gamma=0.99):
@@ -32,6 +35,8 @@ def discount_rewards(rewards, gamma=0.99):
 def reinforce(
     env, policy_estimator, num_episodes=2000, batch_size=10, gamma=0.99
 ):  # Set up lists to hold results
+    results = {"ep": [], "avg_rewards": []}
+    totorch = lambda x: torch.from_numpy(x)
     total_rewards = []
     batch_rewards = []
     batch_actions = []
@@ -39,7 +44,7 @@ def reinforce(
     batch_counter = 1
 
     # Define optimizer
-    optimizer = optim.Adam(policy_estimator.network.parameters(), lr=0.01)
+    optimizer = optim.Adam(policy_estimator.parameters(), lr=0.01)
 
     action_space = np.arange(env.action_space.n)
     ep = 0
@@ -51,7 +56,8 @@ def reinforce(
         done = False
         while done == False:
             # Get actions and convert to numpy array
-            action_probs = policy_estimator.predict(s_0).detach().numpy()
+            tensor_state = totorch(s_0)
+            action_probs = policy_estimator.forward(tensor_state).detach().numpy()
             action = np.random.choice(action_space, p=action_probs)
             s_1, r, done, _ = env.step(action)
 
@@ -71,14 +77,14 @@ def reinforce(
                 # If batch is complete, update network
                 if batch_counter == batch_size:
                     optimizer.zero_grad()
-                    state_tensor = torch.FloatTensor(batch_states)
-                    reward_tensor = torch.FloatTensor(batch_rewards)
-                    # Actions are used as indices, must be
-                    # LongTensor
-                    action_tensor = torch.LongTensor(batch_actions)
+                    state_tensor = torch.FloatTensor(np.array(batch_states))
+                    reward_tensor = torch.FloatTensor(np.array(batch_rewards))
+                    # Actions are used as indices, must be LongTensor
+                    action_tensor = torch.LongTensor(np.array([batch_actions])).T
 
                     # Calculate loss
-                    logprob = torch.log(policy_estimator.predict(state_tensor))
+                    logprob = torch.log(policy_estimator.forward(state_tensor))
+
                     selected_logprobs = (
                         reward_tensor
                         * torch.gather(logprob, 1, action_tensor).squeeze()
@@ -97,11 +103,15 @@ def reinforce(
 
                 avg_rewards = np.mean(total_rewards[-100:])
                 # Print running average
-                print(
-                    "\rEp: {} Average of last 100:"
-                    + "{:.2f}".format(ep + 1, avg_rewards),
-                    end="",
-                )
+                # print(
+                #     "Ep: {} - Average of rewards of last 100: {:.2f}".format(
+                #         ep + 1, avg_rewards
+                #     )
+                # )
+                if (ep + 1) % 100 == 0:
+                    print(ep + 1)
+                results["ep"].append(ep + 1)
+                results["avg_rewards"].append(avg_rewards)
                 ep += 1
 
-    return total_rewards
+    return results
