@@ -1,0 +1,36 @@
+import torch
+from torch import nn
+from torch.nn import functional as F
+from torch import optim
+
+
+class ModelMNIST(nn.Module):
+    def __init__(self, nclasses):
+        super(DQN, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, (3, 3))
+        self.conv2 = nn.Conv2d(32, 64, (3, 3))
+        self.maxp2d = nn.MaxPool2d((2, 2))
+        self.dropout1 = nn.Dropout(0.25)
+        self.hidden_layer = nn.Linear(24 * 24 * 64, 128)
+        self.dropout2 = nn.Dropout(0.5)
+        self.output = nn.Linear(128, nclasses)
+
+    def forward(self, x):
+        x = x.to(device)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = self.maxp2d(x)
+        x = self.dropout1(x)
+
+        x = x.view(x.size(0), -1)  # flatten
+        x = F.relu(hidden_layer(x))
+
+        x = x.dropout2(x)
+        return F.softmax(self.output(x))
+
+
+extras = {
+    "optimizer": lambda params: optim.Adadelta(params, lr=0.001, eps=1e-07),
+    "loss": nn.CrossEntropyLoss(),
+    # accuracy : manully
+}
