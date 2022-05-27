@@ -9,11 +9,11 @@ import numpy as np
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class Estimator(nn.Module):
+class ReinforceAgent(nn.Module):
 
     NHIDDEN = 128
 
-    def __init__(self, ninput, noutput):
+    def __init__(self, ninput, noutput, *args, **kwargs):
         super(Estimator, self).__init__()
         self.input = nn.Linear(ninput, self.NHIDDEN)
         self.output = nn.Linear(self.NHIDDEN, noutput)

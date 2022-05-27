@@ -4,6 +4,9 @@ from torchvision import datasets
 from torchvision.transforms import ToTensor
 
 
+PARTITION_TYPE = "IID"
+NODES = 4
+
 isdownloaded = not (DATA_PATH.exists())
 mnist_dataset = {}
 mnist_dataset["training"] = datasets.MNIST(
