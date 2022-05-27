@@ -30,6 +30,14 @@ def generate_IID_parties(dataset, k_nodes, path, **kwargs):
     random.shuffle(train_indices)
     random.shuffle(test_indices)
 
+    print("Informations:")
+    print("Training dataset:")
+    print(dataset["training"])
+    print("Number of samples per node (training):", mtr)
+    print("\n Test dataset:")
+    print(dataset["test"])
+    print("Number of samples per node (test):", mte)
+    print("\nGeneration of data for nodes (total = {} nodes) ...".format(k_nodes))
     for i in range(k_nodes):
         rtr = size_train % k_nodes if i + 1 == k_nodes else 0
         rte = size_test % k_nodes if i + 1 == k_nodes else 0
@@ -52,6 +60,7 @@ def generate_IID_parties(dataset, k_nodes, path, **kwargs):
         name_file = "nodes-" + str(i + 1) + ".pkl"
         with open(path / name_file, "wb") as file:
             pickle.dump(node_data, file)
+        print("Data for node {} saved".format(i + 1))
 
 
 # def generate_non_IID_label_parties(

@@ -10,6 +10,7 @@ def create(path):
         if not (path.parent.exists()):
             create(path.parent)
         path.mkdir()
+        print("{} was created.".format(str(path)))
 
 
 def iterate(path):
