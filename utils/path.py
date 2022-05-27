@@ -20,3 +20,7 @@ def iterate(path):
         index += 1
 
     return path / f"experiment-{index}"
+
+
+def data_path_key(dataset_name, partition_type, k_nodes):
+    return EXP_PATH / "data-{}-{}-{}".format(dataset_name, partition_type, k_nodes)

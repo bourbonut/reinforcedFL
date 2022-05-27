@@ -1,11 +1,10 @@
-from utils.path import create, iterate, EXP_PATH, DATA_PATH
+from utils.path import create, iterate, data_path_key, EXP_PATH, DATA_PATH
 from utils.partition import *
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 import pickle
 
 create(EXP_PATH)
-curr_path = EXP_PATH
 nodes = 4
 isdownloaded = not (DATA_PATH.exists())
 mnist_dataset = {}
@@ -24,7 +23,7 @@ def test_dataset():
 
 
 def test_generate_IID():
-    nodes_data_path = curr_path / "data-IID-4" / "nodes"
+    nodes_data_path = data_path_key("MNIST", "IID", nodes) / "nodes"
     create(nodes_data_path)
     generate_IID_parties(mnist_dataset, nodes, nodes_data_path)
     assert nodes_data_path.exists()
