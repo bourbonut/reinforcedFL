@@ -2,7 +2,7 @@
 Functions to partition data
 """
 
-import warnings, random, numpy as np
+import warnings, random, pickle
 
 
 def generate_IID_parties(dataset, k_nodes, path, **kwargs):
@@ -13,8 +13,8 @@ def generate_IID_parties(dataset, k_nodes, path, **kwargs):
         dataset (dict[str, VisionDataset]):
             "training" for training data and "test" for test data
             where data must be `VisionDataset`
-        nb_per_node (list[int]): Number of samples per client
-        node_folder (str): Folder to save nodes' data
+        k_nodes (int): Number of node
+        path (Path): Folder to save data for nodes
     """
 
     msg = "Training data and test data have not the same number of labels"
@@ -24,12 +24,11 @@ def generate_IID_parties(dataset, k_nodes, path, **kwargs):
     num_labels = len(dataset["training"].classes)
     mtr, mte = (size_train // k_nodes, size_test // k_nodes)  # samples per node
 
-    assert_msg = "The sum of samples per parties ({}) should be less or equal to the total number of samples ({})"
-    assert sum(nb_per_node) <= num_train, assert_msg.format(sum(nb_per_node), num_train)
-
     # Shuffle indices to select random samples
-    train_indices = random.shuffle(range(size_train))
-    test_indices = random.shuffle(range(size_test))
+    train_indices = list(range(size_train))
+    test_indices = list(range(size_test))
+    random.shuffle(train_indices)
+    random.shuffle(test_indices)
 
     for i in range(k_nodes):
         rtr = size_train % k_nodes if i + 1 == k_nodes else 0
@@ -38,15 +37,21 @@ def generate_IID_parties(dataset, k_nodes, path, **kwargs):
         node_train_indices = train_indices[mtr * i : mtr * (i + 1) + rtr]
         node_test_indices = test_indices[mte * i : mte * (i + 1) + rte]
 
+        # Generate data
+        node_data = [[], [], [], []]
+        c = 0
+        for key in dataset:
+            data = dataset[key]
+            indices = node_train_indices if key == "training" else node_test_indices
+            for sample, label in (data[i] for i in indices):
+                node_data[c].append(sample)
+                node_data[c + 1].append(label)
+            c += 2
+
         # Now put it all in an npz
-        name_file = "data_party" + str(i + 1) + ".npz"
-        np.savez(
-            path / name_file,
-            x_train=[dataset["training"][x][0] for x in node_train_indices],
-            y_train=[dataset["training"][x][1] for x in node_train_indices],
-            x_test=[dataset["test"][x][0] for x in node_test_indices],
-            y_test=[dataset["test"][x][1] for x in node_test_indices],
-        )
+        name_file = "nodes-" + str(i + 1) + ".pkl"
+        with open(path / name_file, "wb") as file:
+            pickle.dump(node_data, file)
 
 
 # def generate_non_IID_label_parties(

@@ -7,6 +7,8 @@ DATA_PATH = Path().absolute() / "data"
 
 def create(path):
     if not (path.exists()):
+        if not (path.parent.exists()):
+            create(path.parent)
         path.mkdir()
 
 
