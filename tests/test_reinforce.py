@@ -1,11 +1,11 @@
-from evaluator.model import *
+from evaluator import *
 import gym
 
 env = gym.make("CartPole-v0")
-Estimator.NHIDDEN = 16
+ReinforceAgent.NHIDDEN = 16
 ninput = env.observation_space.shape[0]
 noutput = env.action_space.n
-agent = Estimator(ninput, noutput).to(device)
+agent = ReinforceAgent(ninput, noutput).to(device)
 
 
 def func(x):
