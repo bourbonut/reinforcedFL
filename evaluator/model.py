@@ -14,7 +14,7 @@ class ReinforceAgent(nn.Module):
     NHIDDEN = 128
 
     def __init__(self, ninput, noutput, *args, **kwargs):
-        super(Estimator, self).__init__()
+        super(ReinforceAgent, self).__init__()
         self.input = nn.Linear(ninput, self.NHIDDEN)
         self.output = nn.Linear(self.NHIDDEN, noutput)
 
