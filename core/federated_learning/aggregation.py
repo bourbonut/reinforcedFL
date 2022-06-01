@@ -1,4 +1,4 @@
-from evaluator.model import ReinforceAgent
+from core.evaluator.model import ReinforceAgent
 
 
 class EvaluatorServer(ReinforceAgent):

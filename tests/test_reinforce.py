@@ -1,4 +1,4 @@
-from evaluator import *
+from core import *
 import gym
 import pytest
 
