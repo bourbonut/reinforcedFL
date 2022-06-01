@@ -1,5 +1,6 @@
 from evaluator import *
 import gym
+import pytest
 
 env = gym.make("CartPole-v0")
 ReinforceAgent.NHIDDEN = 16
@@ -23,6 +24,7 @@ def test_neural_network():
     assert agent.output.out_features == 2
 
 
+@pytest.mark.slow
 def test_reinforce():
     results = reinforce(env, agent)
     assert results["ep"][-1] == 2000

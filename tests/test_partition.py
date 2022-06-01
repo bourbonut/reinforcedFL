@@ -2,7 +2,7 @@ from utils.path import create, iterate, data_path_key, EXP_PATH, DATA_PATH
 from utils.partition import *
 from torchvision import datasets
 from torchvision.transforms import ToTensor
-import pickle
+import pickle, pytest
 
 create(EXP_PATH)
 nodes = 4
@@ -22,6 +22,7 @@ def test_dataset():
     assert "training" in mnist_dataset and "test" in mnist_dataset
 
 
+@pytest.mark.slow
 def test_generate_IID():
     nodes_data_path = data_path_key("MNIST", "IID", nodes) / "nodes"
     create(nodes_data_path)
