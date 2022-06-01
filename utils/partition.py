@@ -2,7 +2,18 @@
 Functions to partition data
 """
 
-import warnings, random, pickle
+import warnings, random, pickle, torch
+
+
+class WorkerDataset(torch.utils.data.Dataset):
+    def __init__(self, data):
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
 
 
 def generate_IID_parties(dataset, k_nodes, path, **kwargs):
@@ -46,15 +57,11 @@ def generate_IID_parties(dataset, k_nodes, path, **kwargs):
         node_test_indices = test_indices[mte * i : mte * (i + 1) + rte]
 
         # Generate data
-        node_data = [[], [], [], []]
-        c = 0
-        for key in dataset:
+        node_data = [None, None]
+        for j, key in enumerate(dataset):
             data = dataset[key]
             indices = node_train_indices if key == "training" else node_test_indices
-            for sample, label in (data[i] for i in indices):
-                node_data[c].append(sample)
-                node_data[c + 1].append(label)
-            c += 2
+            node_data[j] = WorkerDataset([data[idx] for idx in indices])
 
         # Now put it all in an npz
         name_file = "nodes-" + str(i + 1) + ".pkl"
