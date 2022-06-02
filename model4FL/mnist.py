@@ -33,6 +33,6 @@ class ModelMNIST(nn.Module):
 
 extras = {
     "optimizer": lambda params: optim.Adadelta(params),
-    "loss": nn.CrossEntropyLoss,
+    "criterion": nn.CrossEntropyLoss,
     # accuracy : manually
 }

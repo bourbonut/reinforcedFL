@@ -47,10 +47,9 @@ def test_loss():
 def test_backpropagation():
     i, (samples, labels) = next(enumerate(trainloader))
     prediction = model(samples)
-    loss_class = extras["loss"]
     optimizer = extras["optimizer"](model.parameters())
 
-    criterion = loss_class()
+    criterion = extras["criterion"]()
     loss = criterion(prediction, labels)
 
     optimizer.zero_grad()
@@ -62,7 +61,7 @@ def test_backpropagation():
 def test_train():
     num_epochs = 5
     optimizer = extras["optimizer"](model.parameters())
-    criterion = extras["loss"]()
+    criterion = extras["criterion"]()
 
     size = len(mnist_dataset["training"])
     with Progress(auto_refresh=False) as progress:
