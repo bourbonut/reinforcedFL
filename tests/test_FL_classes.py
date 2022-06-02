@@ -14,7 +14,7 @@ def test_federated_averaging():
         Node(model, data_path / "nodes-{}.pkl".format(i + 1), **extras)
         for i, model in enumerate(models)
     )
-    aggregator = FederatedAveraging(ModelMNIST(10), 60000)
+    aggregator = FederatedAveraging(ModelMNIST(10), 60000, 10000)
     for worker in workers:
         aggregator.communicatewith(worker)
 
@@ -35,19 +35,19 @@ def test_federated_averaging():
 
 
 @pytest.mark.slow
-def test_worker_forward():
+def test_worker_train():
     worker = Node(ModelMNIST(10), data_path / "nodes-1.pkl", **extras)
-    worker.forward()
+    worker.train()
 
 
 @pytest.mark.slow
-def test_multiprocessing():
+def test_multithreading():
     models = tuple(ModelMNIST(10) for _ in range(4))
     workers = tuple(
         Node(model, data_path / "nodes-{}.pkl".format(i + 1), **extras)
         for i, model in enumerate(models)
     )
-    train = lambda worker: worker.forward()
+    train = lambda worker: worker.train()
     threads = [Thread(target=train, args=(worker,)) for worker in workers]
     for thread in threads:
         thread.start()

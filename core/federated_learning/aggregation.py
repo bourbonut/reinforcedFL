@@ -17,10 +17,11 @@ class EvaluatorServer(ReinforceAgent):
 
 
 class FederatedAveraging:
-    def __init__(self, global_model, size_dataset, *args, **kwargs):
+    def __init__(self, global_model, size_traindata, size_testdata, *args, **kwargs):
         self.global_model = global_model
         self.workers_updates = []
-        self.n = size_dataset
+        self.n = size_traindata
+        self.t = size_testdata
 
     def send(self):
         return self.global_model.state_dict()
@@ -46,3 +47,9 @@ class FederatedAveraging:
         for target_param, param in zip(self.global_model.parameters(), new_weights):
             target_param.data.copy_(param.data)
         self.workers_updates.clear()
+
+    def global_accuracy(self, workers_accuracies):
+        """
+        Compute the global accuracy based on the federated averaging algorithm
+        """
+        return reduce(add, workers_accuracies) / self.t
