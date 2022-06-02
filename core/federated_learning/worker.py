@@ -1,14 +1,21 @@
+from torch.utils.data import DataLoader
 import pickle
 
 
 class Node:
-    def __init__(self, data_path, model):
+    def __init__(self, model, data_path, batch_size=64):
         with open(data_path, "rb") as file:
             data = pickle.load(file)
-        self.xtrain, self.ytrain, self.xtest, self.ytest = data
+        self.trainloader = DataLoader(data[0], batch_size=batch_size, num_workers=1)
+        self.testloader = DataLoader(data[1], batch_size=batch_size, num_workers=1)
+        self.nk = len(self.trainloader)  # number of local examples
+        self.model = model
 
     def receive(self, parameters):
-        self.load_state_dict(parameters)
+        self.model.load_state_dict(parameters)
 
     def send(self):
-        pass
+        return [self.nk * weight for weight in self.model.parameters()]
+
+    def communicatewith(self, aggregator):
+        self.receive(aggregator.send())
