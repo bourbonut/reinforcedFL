@@ -59,17 +59,26 @@ global_accs = []
 with Progress(auto_refresh=False) as progress:
     task = progress.add_task("Training ...", total=ROUNDS * EPOCHES)
     for r in range(ROUNDS):
+        # Workers download the global model
         for worker in workers:
             worker.communicatewith(server)
+
+        # Workers evaluate accuracy of the global model
+        # on their local data
         accuracies = evaluate(workers)
         avg_acc = server.global_accuracy(accuracies)
         global_accs.append(avg_acc)
+
+        # Training loop of workers
         for _ in range(EPOCHES):
             train(workers)
             progress.advance(task)
             progress.refresh()
+
+        # Server downloads all local updates
         for worker in workers:
             server.communicatewith(worker)
+        server.update()
 
 with open("result.pkl", "wb") as file:
     pickle.dump(global_accs, file)
