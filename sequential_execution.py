@@ -33,10 +33,11 @@ size_testdata = len(mnist_dataset["test"])  # for aggregation
 print("Generate data for workers", end="")
 nodes_data_path = data_path_key("MNIST", "IID", NODES) / "nodes"
 if not (nodes_data_path.exists()):
+    create(nodes_data_path)
     generate_IID_parties(mnist_dataset, NODES, nodes_data_path)
     print(" ->[bold green] OK")
 else:
-    print(" ->[bold green] Already done")
+    print(" ->[bold yellow] Already done")
 
 
 # Initialization of the server
