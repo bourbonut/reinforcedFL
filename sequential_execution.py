@@ -66,6 +66,7 @@ with Progress(auto_refresh=False) as progress:
         # Workers evaluate accuracy of the global model
         # on their local data
         accuracies = evaluate(workers)
+        print(accuracies)
         avg_acc = server.global_accuracy(accuracies)
         global_accs.append(avg_acc)
 

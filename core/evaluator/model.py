@@ -9,7 +9,12 @@ import numpy as np
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+# WARNING: Not finished, only works on CartPole (see `gym` library)
 class ReinforceAgent(nn.Module):
+
+    """
+    Neural network for REINFORCE algorithm
+    """
 
     NHIDDEN = 128
 
@@ -25,6 +30,9 @@ class ReinforceAgent(nn.Module):
 
 
 def discount_rewards(rewards, gamma=0.99):
+    """
+    Return the discount reward
+    """
     r = np.array([gamma**i * rewards[i] for i in range(len(rewards))])
     # Reverse the array direction for cumsum and then
     # revert back to the original order
@@ -32,9 +40,11 @@ def discount_rewards(rewards, gamma=0.99):
     return r - r.mean()
 
 
-def reinforce(
-    env, policy_estimator, num_episodes=2000, batch_size=10, gamma=0.99
-):  # Set up lists to hold results
+def reinforce(env, policy_estimator, num_episodes=2000, batch_size=10, gamma=0.99):
+    """
+    Function which follows the REINFORCE algorithm
+    """
+    # Set up lists to hold results
     results = {"ep": [], "avg_rewards": []}
     totorch = lambda x: torch.from_numpy(x)
     total_rewards = []

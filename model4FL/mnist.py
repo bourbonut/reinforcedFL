@@ -7,6 +7,10 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ModelMNIST(nn.Module):
+    """
+    Neural network for MNIST dataset
+    """
+
     def __init__(self, nclasses):
         super(ModelMNIST, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=(3, 3))

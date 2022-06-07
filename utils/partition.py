@@ -6,6 +6,10 @@ import warnings, random, pickle, torch
 
 
 class WorkerDataset(torch.utils.data.Dataset):
+    """
+    Simple class for local dataset
+    """
+
     def __init__(self, data):
         self.data = data
 
@@ -20,12 +24,12 @@ def generate_IID_parties(dataset, k_nodes, path, **kwargs):
     """
     Generate IID data (random shuffle) for each node.
 
-    Args:
+    Parameters :
         dataset (dict[str, VisionDataset]):
             "training" for training data and "test" for test data
             where data must be `VisionDataset`
-        k_nodes (int): Number of node
-        path (Path): Folder to save data for nodes
+        k_nodes (int):  Number of node
+        path (Path):    Folder to save data for nodes
     """
 
     msg = "Training data and test data have not the same number of labels"

@@ -4,6 +4,11 @@ import pickle, torch
 
 
 class Node:
+    """
+    Class which represents a 'worker' and communicate with the server.
+    It holds the local data and a model.
+    """
+
     def __init__(
         self,
         model,
@@ -25,18 +30,28 @@ class Node:
         self.criterion = criterion()
 
     def receive(self, parameters):
+        """
+        When the server 'uploads' the global model parameters, the node
+        receives them through this method
+        """
         self.model.load_state_dict(parameters)
         self.optimizer = self.optim_obj(self.model.parameters())
 
     def send(self):
+        """
+        The node sends his local model parameters through this method
+        """
         return [self.nk * weight for weight in self.model.parameters()]
 
     def communicatewith(self, aggregator):
+        """
+        For convenience, this method is used for communication.
+        """
         self.receive(aggregator.send())
 
     def train(self):
         """
-        Train the model
+        Train the model using local data
         """
         self.model.train()
         for samples, labels in self.trainloader:
@@ -48,7 +63,7 @@ class Node:
 
     def evaluate(self):
         """
-        Compute the accuracy on the data for testing
+        Compute the accuracy on the local data for testing
         """
         correct, total = 0, 0
         self.model.eval()
