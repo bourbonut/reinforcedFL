@@ -80,4 +80,4 @@ class Node:
             _, predicted = torch.max(predictions.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
-        return self.nt * 100 * correct / total
+        return self.nt * correct / total

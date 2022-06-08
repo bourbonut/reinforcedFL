@@ -3,7 +3,8 @@ from core import *
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 from model4FL.mnist import ModelMNIST, extras
-from rich.progress import Progress
+from rich.live import Live
+from rich.table import Table
 from threading import Thread
 from rich import print
 import pickle, torch
@@ -78,9 +79,11 @@ workers = tuple(
 print(" ->[bold green] OK")
 
 global_accs = []
+table = Table()
+table.add_column("Rounds")
+table.add_column("Global accuracy")
 # Main loop
-with Progress(auto_refresh=False) as progress:
-    task = progress.add_task("Training ...", total=ROUNDS * EPOCHES)
+with Live(table) as live_layout:
     for r in range(ROUNDS):
         # Workers download the global model
         for worker in workers:
@@ -92,18 +95,19 @@ with Progress(auto_refresh=False) as progress:
         avg_acc = server.global_accuracy(accuracies)
         global_accs.append(avg_acc)
 
+        table.add_row(str(r), "{:.2%}".format(avg_acc))
+        live_layout.refresh()
+
         # Training loop of workers
         for e in range(EPOCHES):
             curr_path = exp_path / "round{}".format(r) / "epoch{}".format(e)
             create(curr_path, verbose=False)
             train(workers, curr_path)
-            progress.advance(task)
-            progress.refresh()
 
         # Server downloads all local updates
         for worker in workers:
             server.communicatewith(worker)
         server.update()
 
-with open("result.pkl", "wb") as file:
+with open(exp_path / "result.pkl", "wb") as file:
     pickle.dump(global_accs, file)
