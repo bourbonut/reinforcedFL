@@ -5,6 +5,7 @@ from torchvision.transforms import ToTensor
 from model4FL.mnist import ModelMNIST, extras
 from rich.live import Live
 from rich.table import Table
+from rich.panel import Panel
 from threading import Thread
 from rich import print
 import pickle, torch
@@ -35,6 +36,8 @@ def check(workers, aggregator):
         for worker in workers
     )
 
+
+print(panel(PARTITION_TYPE, NODES, ROUNDS, EPOCHES, ON_GPU))
 
 # Get the dataset
 print("Opening the dataset", end="")
