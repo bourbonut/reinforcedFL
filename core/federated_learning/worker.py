@@ -23,8 +23,8 @@ class Node:
             data = pickle.load(file)
         self.trainloader = DataLoader(data[0], batch_size=batch_size, num_workers=1)
         self.testloader = DataLoader(data[1], batch_size=batch_size, num_workers=1)
-        self.nk = len(self.trainloader)  # number of local examples
-        self.nt = len(self.testloader)  # number of local tests
+        self.nk = len(data[0])  # number of local examples
+        self.nt = len(data[1])  # number of local tests
         self.model = model
         self.optim_obj = optimizer
         self.optimizer = self.optim_obj(self.model.parameters())
@@ -64,8 +64,8 @@ class Node:
             loss.backward()
             self.optimizer.step()
         if not (filename is None):
-            print("len(losses):", len(losses), "; self.nk:", self.nk)
-            attrbs = {"title": "Evolution of loss function", "xrange": (0, self.nk - 1)}
+            attrbs = {"title": "Evolution of loss function"}
+            attrbs.update({"xrange": (0, len(losses) - 1)})
             attrbs.update({"x_title": "Steps", "y_title": "Loss values"})
             lineXY({"Losses": losses}, filename, **attrbs)
 

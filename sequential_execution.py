@@ -1,4 +1,3 @@
-#!/home/osboxes/anaconda3/envs/gym/bin/python
 from utils import *
 from core import *
 from torchvision import datasets
@@ -90,10 +89,7 @@ with Progress(auto_refresh=False) as progress:
         # Workers evaluate accuracy of the global model
         # on their local data
         accuracies = evaluate(workers)
-        # print(accuracies)
-        # print(check(workers, server))
         avg_acc = server.global_accuracy(accuracies)
-        # print(avg_acc)
         global_accs.append(avg_acc)
 
         # Training loop of workers

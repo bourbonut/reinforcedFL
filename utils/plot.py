@@ -21,7 +21,7 @@ def lineXY(y, filename, x=None, title="", **kwargs):
             line_chart.add(serie, list(zip(x, y[serie])))
     elif isinstance(y, list):
         if x is None:
-            x = list(range(len(y)))
+            x = list(range(len(y[0])))
         for data in y:
             line_chart.add("", list(zip(x, data)))
     else:
