@@ -7,13 +7,34 @@ from model4FL.mnist import ModelMNIST, extras
 from rich.progress import Progress
 from threading import Thread
 from rich import print
-import pickle
+import pickle, torch
+
+from itertools import starmap
 
 # Parameters
 PARTITION_TYPE = "IID"
 NODES = 4
 ROUNDS = 10
 EPOCHES = 3
+ON_GPU = False
+
+if ON_GPU:
+    from core.sequential_gpu import train, evaluate
+else:
+    from core.parallel import train, evaluate
+
+
+def check(workers, aggregator):
+    return all(
+        all(
+            starmap(
+                torch.equal,
+                zip(worker.model.parameters(), aggregator.global_model.parameters()),
+            )
+        )
+        for worker in workers
+    )
+
 
 # Get the dataset
 print("Opening the dataset", end="")
@@ -39,6 +60,9 @@ if not (nodes_data_path.exists()):
 else:
     print(" ->[bold yellow] Already done")
 
+
+# Experiment path
+exp_path = iterate(EXP_PATH)
 
 # Initialization of the server
 print("Initialization of the server", end="")
@@ -66,13 +90,17 @@ with Progress(auto_refresh=False) as progress:
         # Workers evaluate accuracy of the global model
         # on their local data
         accuracies = evaluate(workers)
-        print(accuracies)
+        # print(accuracies)
+        # print(check(workers, server))
         avg_acc = server.global_accuracy(accuracies)
+        # print(avg_acc)
         global_accs.append(avg_acc)
 
         # Training loop of workers
-        for _ in range(EPOCHES):
-            train(workers)
+        for e in range(EPOCHES):
+            curr_path = exp_path / "round{}".format(r) / "epoch{}".format(e)
+            create(curr_path, verbose=False)
+            train(workers, curr_path)
             progress.advance(task)
             progress.refresh()
 

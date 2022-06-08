@@ -9,15 +9,16 @@ EXP_PATH = ROOT_PATH / "experiments"
 DATA_PATH = Path().absolute() / "data"
 
 
-def create(path):
+def create(path, verbose=True):
     """
     Create a full path recursively
     """
     if not (path.exists()):
         if not (path.parent.exists()):
-            create(path.parent)
+            create(path.parent, verbose=verbose)
         path.mkdir()
-        print("{} was created.".format(str(path)))
+        if verbose:
+            print("{} was created.".format(str(path)))
 
 
 def iterate(path):

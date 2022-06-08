@@ -34,6 +34,31 @@ def test_federated_averaging():
     )
 
 
+def test_federated_averaging_2():
+    ref = ModelMNIST(10)
+    workers = tuple(
+        Node(ref, data_path / "nodes-{}.pkl".format(i + 1), **extras) for i in range(4)
+    )
+    aggregator = FederatedAveraging(ModelMNIST(10), 60000, 10000)
+    for worker in workers:
+        aggregator.communicatewith(worker)
+
+    aggregator.update()
+    assert len(aggregator.workers_updates) == 0
+    for worker in workers:
+        worker.communicatewith(aggregator)
+
+    assert all(
+        all(
+            starmap(
+                torch.equal,
+                zip(worker.model.parameters(), ref.parameters()),
+            )
+        )
+        for worker in workers
+    )
+
+
 @pytest.mark.slow
 def test_worker_train():
     worker = Node(ModelMNIST(10), data_path / "nodes-1.pkl", **extras)
