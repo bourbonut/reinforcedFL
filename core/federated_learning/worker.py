@@ -1,6 +1,7 @@
 from torch.utils.data import DataLoader
 from torch import optim, nn
 import pickle, torch
+from utils import lineXY
 
 
 class Node:
@@ -49,17 +50,24 @@ class Node:
         """
         self.receive(aggregator.send())
 
-    def train(self):
+    def train(self, filename=None):
         """
         Train the model using local data
         """
+        losses = []
         self.model.train()
         for samples, labels in self.trainloader:
             predictions = self.model(samples)
             loss = self.criterion(predictions, labels)
+            losses.append(loss.item())
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+        if not (filename is None):
+            print("len(losses):", len(losses), "; self.nk:", self.nk)
+            attrbs = {"title": "Evolution of loss function", "xrange": (0, self.nk - 1)}
+            attrbs.update({"x_title": "Steps", "y_title": "Loss values"})
+            lineXY({"Losses": losses}, filename, **attrbs)
 
     def evaluate(self):
         """

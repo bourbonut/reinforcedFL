@@ -1,6 +1,4 @@
 from core.evaluator.model import ReinforceAgent
-from functools import reduce
-from operator import add
 
 # WARNING: Class not finished
 class EvaluatorServer(ReinforceAgent):
@@ -68,9 +66,7 @@ class FederatedAveraging:
             In other words, a worker update is : `[nk * w for w in weights]` where
             `nk` is the number of local examples.
         """
-        new_weights = map(
-            lambda layer: reduce(add, layer) / self.n, zip(*self.workers_updates)
-        )
+        new_weights = map(lambda layer: sum(layer) / self.n, zip(*self.workers_updates))
         for target_param, param in zip(self.global_model.parameters(), new_weights):
             target_param.data.copy_(param.data)
         self.workers_updates.clear()
@@ -79,4 +75,4 @@ class FederatedAveraging:
         """
         Compute the global accuracy based on the Federated Averaging algorithm
         """
-        return reduce(add, workers_accuracies) / self.t
+        return sum(workers_accuracies) / self.t
