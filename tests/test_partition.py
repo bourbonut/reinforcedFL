@@ -31,10 +31,16 @@ def test_generate_IID():
     assert nodes_data_path.exists()
     assert len(list(nodes_data_path.iterdir())) == nodes
     ref = len(mnist_dataset["test"]) / len(mnist_dataset["training"])
+    sizes_train = []
+    sizes_test = []
     for filename in nodes_data_path.iterdir():
         with open(filename, "rb") as file:
             data = pickle.load(file)
         assert len(data[1]) / len(data[0]) == ref
+        sizes_train.append(len(data[0]))
+        sizes_test.append(len(data[1]))
+    assert sum(sizes_train) == len(mnist_dataset["training"])
+    assert sum(sizes_test) == len(mnist_dataset["test"])
 
 
 def test_open_dataset():
