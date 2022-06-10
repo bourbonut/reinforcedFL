@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import pickle, pytest
 
 create(EXP_PATH)
-nodes = 4
+nworkers = 4
 isdownloaded = not (DATA_PATH.exists())
 mnist_dataset = {}
 datatrain = datasets.MNIST(
@@ -33,14 +33,16 @@ def test_iid_volume():
     labels = list(datatrain.class_to_idx.values())
     distrb = iid.label(7, labels)
     result = iid.volume(distrb, datatrain, labels)
+    result = list(result.values())
     assert len(result) == len(labels)
     assert all(len(result[i]) == 7 for i in range(len(result)))
     indices = set()
-    for idcs in indices:
-        sidcs = set(idcs)
-        assert len(sidcs) == len(idcs)
-        assert len(sidcs.intersection(indices)) == 0
-        indices = indices.union(sidcs)
+    for idcs in result:
+        for elements in idcs:
+            sidcs = set(elements)
+            assert len(sidcs) == len(elements)
+            assert len(sidcs.intersection(indices)) == 0
+            indices = indices.union(sidcs)
 
 
 def test_noniid_label_unbalanced():
@@ -65,7 +67,9 @@ def test_noniid_volume():
     labels = list(datatrain.class_to_idx.values())
     distrb = noniid.label(7, labels, 3, True)
     result = noniid.volume(distrb, datatrain, labels)
+    result = list(result.values())
     assert len(result) == len(labels)
+    assert all(len(result[i]) >= 3 for i in range(len(result)))
     indices = set()
     for idcs in indices:
         sidcs = set(idcs)
@@ -74,42 +78,97 @@ def test_noniid_volume():
         indices = indices.union(sidcs)
 
 
-# def test_dataset():
-#     assert "training" in mnist_dataset and "test" in mnist_dataset
-#
-#
-# @pytest.mark.slow
-# def test_generate_IID():
-#     nodes_data_path = data_path_key("MNIST", "IID", nodes) / "nodes"
-#     create(nodes_data_path)
-#     generate_IID_parties(mnist_dataset, nodes, nodes_data_path)
-#     assert nodes_data_path.exists()
-#     assert len(list(nodes_data_path.iterdir())) == nodes
-#     ref = len(mnist_dataset["test"]) / len(mnist_dataset["training"])
-#     sizes_train = []
-#     sizes_test = []
-#     for filename in nodes_data_path.iterdir():
-#         with open(filename, "rb") as file:
-#             data = pickle.load(file)
-#         assert len(data[1]) / len(data[0]) == ref
-#         sizes_train.append(len(data[0]))
-#         sizes_test.append(len(data[1]))
-#     assert sum(sizes_train) == len(mnist_dataset["training"])
-#     assert sum(sizes_test) == len(mnist_dataset["test"])
-#
-#
-# def test_open_dataset():
-#     nodes_data_path = data_path_key("MNIST", "IID", nodes) / "nodes"
-#     if nodes_data_path.exists():
-#         batch_size = 64
-#         filename = next(nodes_data_path.iterdir())
-#         with open(filename, "rb") as file:
-#             data = pickle.load(file)
-#         trainloader = DataLoader(data[0], batch_size=batch_size, num_workers=1)
-#         testloader = DataLoader(data[1], batch_size=batch_size, num_workers=1)
-#         sample_train, label_train = next(iter(trainloader))
-#         assert sample_train.shape == (batch_size, 1, 28, 28)
-#         assert label_train.shape == (batch_size,)
-#         sample_test, label_test = next(iter(testloader))
-#         assert sample_test.shape == (batch_size, 1, 28, 28)
-#         assert label_test.shape == (batch_size,)
+def test_generate_IID():
+    wk_data_path = data_path_key("MNIST", "IID", nworkers) / "workers"
+    create(wk_data_path)
+    generate(wk_data_path, datatrain, datatest, nworkers)
+    assert wk_data_path.exists()
+    assert len(list(wk_data_path.iterdir())) == nworkers
+    ref = len(list(datatrain.class_to_idx.values()))
+    for filename in wk_data_path.iterdir():
+        with open(filename, "rb") as file:
+            wkdatatrain, wkdatatest = pickle.load(file)
+        tr_extracted_labels = set([x for _, x in wkdatatrain])
+        te_extracted_labels = set([x for _, x in wkdatatest])
+        assert len(tr_extracted_labels) == ref
+        assert len(te_extracted_labels) == ref
+
+
+def test_generate_nonIID_label_balanced():
+    nworkers = 7
+    wk_data_path = data_path_key("MNIST", "nonIID-label-balanced", nworkers) / "workers"
+    create(wk_data_path)
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        nworkers,
+        label_distrb="noniid",
+        minlabels=3,
+        balanced=True,
+    )
+    assert wk_data_path.exists()
+    assert len(list(wk_data_path.iterdir())) == nworkers
+
+
+def test_generate_nonIID_label_unbalanced():
+    nworkers = 7
+    wk_data_path = (
+        data_path_key("MNIST", "nonIID-label-unbalanded", nworkers) / "workers"
+    )
+    create(wk_data_path)
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        nworkers,
+        label_distrb="noniid",
+        minlabels=3,
+        balanced=False,
+    )
+    assert wk_data_path.exists()
+    assert len(list(wk_data_path.iterdir())) == nworkers
+
+
+def test_generate_nonIID_volume():
+    nworkers = 7
+    wk_data_path = data_path_key("MNIST", "nonIID-volume", nworkers) / "workers"
+    create(wk_data_path)
+    generate(wk_data_path, datatrain, datatest, nworkers, volume_distrb="noniid")
+    assert wk_data_path.exists()
+    assert len(list(wk_data_path.iterdir())) == nworkers
+
+
+def test_generate_nonIID():
+    nworkers = 7
+    wk_data_path = data_path_key("MNIST", "nonIID", nworkers) / "workers"
+    create(wk_data_path)
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        nworkers,
+        label_distrb="noniid",
+        minlabels=3,
+        balanced=False,
+        volume_distrb="noniid",
+    )
+    assert wk_data_path.exists()
+    assert len(list(wk_data_path.iterdir())) == nworkers
+
+
+def test_open_dataset():
+    nodes_data_path = data_path_key("MNIST", "IID", nworkers) / "workers"
+    if nodes_data_path.exists():
+        batch_size = 64
+        filename = next(nodes_data_path.iterdir())
+        with open(filename, "rb") as file:
+            wkdatatrain, wkdatatest = pickle.load(file)
+        trainloader = DataLoader(wkdatatrain, batch_size=batch_size, num_workers=1)
+        testloader = DataLoader(wkdatatest, batch_size=batch_size, num_workers=1)
+        sample_train, label_train = next(iter(trainloader))
+        assert sample_train.shape == (batch_size, 1, 28, 28)
+        assert label_train.shape == (batch_size,)
+        sample_test, label_test = next(iter(testloader))
+        assert sample_test.shape == (batch_size, 1, 28, 28)
+        assert label_test.shape == (batch_size,)

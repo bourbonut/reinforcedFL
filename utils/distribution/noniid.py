@@ -16,8 +16,8 @@ def volume(distrb, dataset, labels):
     return {label: rdindices(indices[label], divisions[label]) for label in labels}
 
 
-def label(nworkers, labels, minlabels, balanded=False):
-    if balanded:
+def label(nworkers, labels, minlabels, balanced=False):
+    if balanced:
         # number of labels to be added on workers
         l = len(labels)
         p, r = divmod(l - (nworkers * minlabels) % l, nworkers)

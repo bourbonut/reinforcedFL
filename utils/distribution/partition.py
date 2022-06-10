@@ -33,7 +33,7 @@ def generate(
     nworkers,
     label_distrb="iid",
     minlabels=3,
-    balanded=False,
+    balanced=False,
     volume_distrb="iid",
 ):
     msg = "Training data must have the same labels as testing data"
@@ -49,7 +49,7 @@ def generate(
     # Values which are equal to the label of classes
     labels = list(datatrain.class_to_idx.values())
     # Distribution of labels
-    distrb = label(nworkers, labels, minlabels, balanded=balanded)
+    distrb = label(nworkers, labels, minlabels, balanced=balanced)
     # Generate training indices
     train_indices = volume(distrb, datatrain, labels)
     # Generate testing indices
@@ -65,7 +65,7 @@ def generate(
         test_indices[label].pop(0)
         return indices
 
-    for worker_labels in distrb:
+    for k, worker_labels in enumerate(distrb):
         # Worker training indices
         wktrain_indices = reduce(add, map(train_pickup, worker_labels))
         # Worker testing indices
@@ -78,7 +78,7 @@ def generate(
         ]
 
         # Now put it all in an npz
-        name_file = "worker-" + str(i + 1) + ".pkl"
+        name_file = "worker-" + str(k + 1) + ".pkl"
         with open(path / name_file, "wb") as file:
             pickle.dump(worker_data, file)
-        print("Data for node {} saved".format(i + 1))
+        print("Data for node {} saved".format(k + 1))
