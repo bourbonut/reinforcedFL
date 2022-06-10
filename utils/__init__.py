@@ -6,7 +6,7 @@ Module for all functions useful for :
 """
 
 from .path import *
-from .partition import generate_IID_parties
+from .distribution import *
 from .plot import lineXY
 from rich.panel import Panel
 
