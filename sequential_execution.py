@@ -12,11 +12,13 @@ import pickle, torch
 
 from itertools import starmap
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # Parameters
 NWORKERS = 4
 ROUNDS = 10
 EPOCHES = 3
-ON_GPU = False
+ON_GPU = True
 PARTITION_TYPE = "nonIID"
 
 if ON_GPU:
@@ -64,14 +66,14 @@ exp_path = iterate(EXP_PATH)
 
 # Initialization of the server
 print("Initialization of the server", end="")
-server = FederatedAveraging(ModelMNIST(nclasses), size_traindata, size_testdata)
+server = FederatedAveraging(ModelMNIST(nclasses).to(device), size_traindata, size_testdata)
 print(" ->[bold green] OK")
 
 # Initialization of workers
 print("Initialization of the workers", end="")
 models = (ModelMNIST(nclasses) for _ in range(4))
 workers = tuple(
-    Node(model, wk_data_path / "worker-{}.pkl".format(i + 1))
+        Node(model.to(device), wk_data_path / "worker-{}.pkl".format(i + 1))
     for i, model in enumerate(models)
 )
 print(" ->[bold green] OK")

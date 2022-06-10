@@ -6,7 +6,7 @@ Functions to run for making parallel the training part of workers
 from threading import Thread
 
 
-def train(workers, path=None):
+def train(workers, path):
     """
     Train workers on their local data in parallel
     """
