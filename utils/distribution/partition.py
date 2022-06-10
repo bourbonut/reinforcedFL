@@ -3,6 +3,12 @@ Functions to partition data
 """
 
 import random, pickle, torch, copy
+from functools import reduce
+from operator import add
+from utils.distribution import noniid
+from utils.distribution import iid
+
+MODULES = {"iid": iid, "noniid": iid}
 
 
 class WorkerDataset(torch.utils.data.Dataset):
@@ -20,60 +26,59 @@ class WorkerDataset(torch.utils.data.Dataset):
         return self.data[idx]
 
 
-def generate(datatrain, datatest, nworkers):
-    # rnglist = [random.random() for _ in range(nfractions)]
-    pass
+def generate(
+    path,
+    datatrain,
+    datatest,
+    nworkers,
+    label_distrb="iid",
+    minlabels=3,
+    balanded=False,
+    volume_distrb="iid",
+):
+    msg = "Training data must have the same labels as testing data"
+    assert datatrain.classes == datatest.classes, msg
+    msg = "Training data must have the same number of labels as testing data"
+    get_nb_labels = lambda x: len(list(x.class_to_idx.values()))
+    assert get_nb_labels(datatrain) == get_nb_labels(datatest), msg
 
+    # Load functions for distribution
+    label = MODULES[label_distrb].label
+    volume = MODULES[volume_distrb].volume
 
-def generate_IID_parties(dataset, k_nodes, path, **kwargs):
-    """
-    Generate IID data (random shuffle) for each node.
+    # Values which are equal to the label of classes
+    labels = list(datatrain.class_to_idx.values())
+    # Distribution of labels
+    distrb = label(nworkers, labels, minlabels, balanded=balanded)
+    # Generate training indices
+    train_indices = volume(distrb, datatrain, labels)
+    # Generate testing indices
+    test_indices = volume(distrb, datatest, labels)
 
-    Parameters :
-        dataset (dict[str, VisionDataset]):
-            "training" for training data and "test" for test data
-            where data must be `VisionDataset`
-        k_nodes (int):  Number of node
-        path (Path):    Folder to save data for nodes
-    """
+    def train_pickup(label):
+        indices = train_indices[label][0]
+        train_indices[label].pop(0)
+        return indices
 
-    msg = "Training data and test data have not the same number of labels"
-    assert dataset["training"].classes == dataset["test"].classes, msg
-    size_train = len(dataset["training"])
-    size_test = len(dataset["test"])
-    num_labels = len(dataset["training"].classes)
-    mtr, mte = (size_train // k_nodes, size_test // k_nodes)  # samples per node
+    def test_pickup(label):
+        indices = test_indices[label][0]
+        test_indices[label].pop(0)
+        return indices
 
-    # Shuffle indices to select random samples
-    train_indices = list(range(size_train))
-    test_indices = list(range(size_test))
-    random.shuffle(train_indices)
-    random.shuffle(test_indices)
-
-    print("Informations:")
-    print("Training dataset:")
-    print(dataset["training"])
-    print("Number of samples per node (training):", mtr)
-    print("\n Test dataset:")
-    print(dataset["test"])
-    print("Number of samples per node (test):", mte)
-    print("\nGeneration of data for nodes (total = {} nodes) ...".format(k_nodes))
-    for i in range(k_nodes):
-        rtr = size_train % k_nodes if i + 1 == k_nodes else 0
-        rte = size_test % k_nodes if i + 1 == k_nodes else 0
-        # Select indices for each node and get the data
-        node_train_indices = train_indices[mtr * i : mtr * (i + 1) + rtr]
-        node_test_indices = test_indices[mte * i : mte * (i + 1) + rte]
+    for worker_labels in distrb:
+        # Worker training indices
+        wktrain_indices = reduce(add, map(train_pickup, worker_labels))
+        # Worker testing indices
+        wktest_indices = reduce(add, map(test_pickup, worker_labels))
 
         # Generate data
-        node_data = [None, None]
-        for j, key in enumerate(dataset):
-            data = dataset[key]
-            indices = node_train_indices if key == "training" else node_test_indices
-            node_data[j] = WorkerDataset([data[idx] for idx in indices])
+        worker_data = [
+            WorkerDataset([datatrain[i] for i in wktrain_indices]),
+            WorkerDataset([datatest[i] for i in wktest_indices]),
+        ]
 
         # Now put it all in an npz
-        name_file = "nodes-" + str(i + 1) + ".pkl"
+        name_file = "worker-" + str(i + 1) + ".pkl"
         with open(path / name_file, "wb") as file:
-            pickle.dump(node_data, file)
+            pickle.dump(worker_data, file)
         print("Data for node {} saved".format(i + 1))

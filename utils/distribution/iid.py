@@ -14,10 +14,10 @@ def volume(distrb, dataset, labels):
     indices = {label: [] for label in labels}
     for i, label in enumerate(extracted_labels):
         indices[label].append(i)
-    return [rdindices(indices[label], divisions[label]) for label in labels]
+    return {label: rdindices(indices[label], divisions[label]) for label in labels}
 
 
-def label(nworkers, labels):
+def label(nworkers, labels, *args, **kwargs):
     return [labels for _ in range(nworkers)]
 
 

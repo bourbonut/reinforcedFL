@@ -13,17 +13,18 @@ def volume(distrb, dataset, labels):
     indices = {label: [] for label in labels}
     for i, label in enumerate(extracted_labels):
         indices[label].append(i)
-    return [rdindices(indices[label], divisions[label]) for label in labels]
+    return {label: rdindices(indices[label], divisions[label]) for label in labels}
 
 
 def label(nworkers, labels, minlabels, balanded=False):
     if balanded:
         # number of labels to be added on workers
         l = len(labels)
-        r = (nworkers * minlabels) % l
-        distrb = [minlabels + (i < l - r) for i in range(nworkers)]
-        total_distrb = sum(distrb)
-        tokens = {label: minlabels for label in labels}
+        p, r = divmod(l - (nworkers * minlabels) % l, nworkers)
+        distrb = [minlabels + p + (i < r) for i in range(nworkers)]
+        # distrib has k * (l * minlabels) elements
+        k = sum(distrb) // (l * minlabels)
+        tokens = {label: k * minlabels for label in labels}
     else:
         distrb = [minlabels for _ in range(nworkers)]
         total_distrb = sum(distrb)
