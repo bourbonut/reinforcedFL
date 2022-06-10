@@ -13,52 +13,47 @@ import pickle, torch
 from itertools import starmap
 
 # Parameters
-PARTITION_TYPE = "IID"
-NODES = 4
+NWORKERS = 4
 ROUNDS = 10
 EPOCHES = 3
 ON_GPU = False
+PARTITION_TYPE = "nonIID"
 
 if ON_GPU:
     from core.sequential_gpu import train, evaluate
 else:
     from core.parallel import train, evaluate
 
-
-def check(workers, aggregator):
-    return all(
-        all(
-            starmap(
-                torch.equal,
-                zip(worker.model.parameters(), aggregator.global_model.parameters()),
-            )
-        )
-        for worker in workers
-    )
-
-
-print(panel(PARTITION_TYPE, NODES, ROUNDS, EPOCHES, ON_GPU))
+print(panel(PARTITION_TYPE, NWORKERS, ROUNDS, EPOCHES, ON_GPU))
 
 # Get the dataset
 print("Opening the dataset", end="")
 isdownloaded = not (DATA_PATH.exists())
-mnist_dataset = {}
-mnist_dataset["training"] = datasets.MNIST(
+datatrain = datasets.MNIST(
     root="data", train=True, download=isdownloaded, transform=ToTensor()
 )
-mnist_dataset["test"] = datasets.MNIST(root="data", train=False, transform=ToTensor())
+datatest = datasets.MNIST(root="data", train=False, transform=ToTensor())
 print(" ->[bold green] OK")
 
-nclasses = len(mnist_dataset["training"].classes)  # for the model
-size_traindata = len(mnist_dataset["training"])  # for aggregation
-size_testdata = len(mnist_dataset["test"])  # for aggregation
+nclasses = len(datatrain.classes)  # for the model
+size_traindata = len(datatrain)  # for aggregation
+size_testdata = len(datatest)  # for aggregation
 
 # Get path of data for workers and generate them
 print("Generate data for workers", end="")
-nodes_data_path = data_path_key("MNIST", "IID", NODES) / "nodes"
-if not (nodes_data_path.exists()):
-    create(nodes_data_path)
-    generate_IID_parties(mnist_dataset, NODES, nodes_data_path)
+wk_data_path = data_path_key("MNIST", "nonIID", NWORKERS) / "workers"
+if not (wk_data_path.exists()):
+    create(wk_data_path)
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        NWORKERS,
+        label_distrb="noniid",
+        volume_distrb="noniid",
+        minlabels=3,
+        balanced=False,
+    )
     print(" ->[bold green] OK")
 else:
     print(" ->[bold yellow] Already done")
@@ -76,7 +71,7 @@ print(" ->[bold green] OK")
 print("Initialization of the workers", end="")
 models = (ModelMNIST(nclasses) for _ in range(4))
 workers = tuple(
-    Node(model, nodes_data_path / "nodes-{}.pkl".format(i + 1))
+    Node(model, wk_data_path / "worker-{}.pkl".format(i + 1))
     for i, model in enumerate(models)
 )
 print(" ->[bold green] OK")
