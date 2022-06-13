@@ -3,7 +3,7 @@ Functions to run when a GPU is available
 """
 
 
-def train(workers):
+def train(workers, *args):
     """
     Train workers on their local data in sequential
     """

@@ -3,6 +3,7 @@ from torch import optim, nn
 import pickle, torch
 from utils import lineXY
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Node:
     """
@@ -58,7 +59,7 @@ class Node:
         self.model.train()
         for samples, labels in self.trainloader:
             predictions = self.model(samples)
-            loss = self.criterion(predictions, labels)
+            loss = self.criterion(predictions, labels.to(device))
             losses.append(loss.item())
             self.optimizer.zero_grad()
             loss.backward()
@@ -79,5 +80,5 @@ class Node:
             predictions = self.model(samples)
             _, predicted = torch.max(predictions.data, 1)
             total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            correct += (predicted == labels.to(device)).sum().item()
         return self.nt * correct / total
