@@ -12,6 +12,8 @@ import pickle, torch
 
 from itertools import starmap
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # Parameters
 NWORKERS = 4
 ROUNDS = 10
@@ -53,6 +55,7 @@ if not (wk_data_path.exists()):
         volume_distrb="noniid",
         minlabels=3,
         balanced=False,
+        save2png=True,
     )
     print(" ->[bold green] OK")
 else:
@@ -64,7 +67,9 @@ exp_path = iterate(EXP_PATH)
 
 # Initialization of the server
 print("Initialization of the server", end="")
-server = FederatedAveraging(ModelMNIST(nclasses), size_traindata, size_testdata)
+server = FederatedAveraging(
+    ModelMNIST(nclasses).to(device), size_traindata, size_testdata
+)
 print(" ->[bold green] OK")
 
 # Initialization of workers

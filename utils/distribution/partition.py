@@ -7,8 +7,9 @@ from functools import reduce
 from operator import add
 from utils.distribution import noniid
 from utils.distribution import iid
+from utils.plot import stacked
 
-MODULES = {"iid": iid, "noniid": iid}
+MODULES = {"iid": iid, "noniid": noniid}
 
 
 class WorkerDataset(torch.utils.data.Dataset):
@@ -35,6 +36,7 @@ def generate(
     minlabels=3,
     balanced=False,
     volume_distrb="iid",
+    save2png=False,
 ):
     msg = "Training data must have the same labels as testing data"
     assert datatrain.classes == datatest.classes, msg
@@ -65,9 +67,11 @@ def generate(
         test_indices[label].pop(0)
         return indices
 
+    distrb_per_wk = {"Worker {}".format(i): [0] * len(labels) for i in range(nworkers)}
     for k, worker_labels in enumerate(distrb):
         # Worker training indices
-        wktrain_indices = reduce(add, map(train_pickup, worker_labels))
+        indices_per_labels = tuple(map(train_pickup, worker_labels))
+        wktrain_indices = reduce(add, indices_per_labels)
         # Worker testing indices
         wktest_indices = reduce(add, map(test_pickup, worker_labels))
 
@@ -77,8 +81,19 @@ def generate(
             WorkerDataset([datatest[i] for i in wktest_indices]),
         ]
 
+        if save2png:  # y_stacked of the function `stacked`
+            for label, indices in zip(worker_labels, indices_per_labels):
+                distrb_per_wk["Worker " + str(k)][label] += len(indices)
         # Now put it all in an npz
         name_file = "worker-" + str(k + 1) + ".pkl"
         with open(path / name_file, "wb") as file:
             pickle.dump(worker_data, file)
         print("Data for node {} saved".format(k + 1))
+
+    if save2png:
+        stacked(
+            labels,
+            distrb_per_wk,
+            path / "distribution.png",
+            title="Distribution of labels between workers",
+        )
