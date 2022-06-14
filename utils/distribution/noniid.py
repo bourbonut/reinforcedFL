@@ -17,21 +17,24 @@ def volume(distrb, dataset, labels):
 
 
 def label(nworkers, labels, minlabels, balanced=False):
+    l = len(labels)
     if balanced:
         # number of labels to be added on workers
-        l = len(labels)
-        p, r = divmod(l - (nworkers * minlabels) % l, nworkers)
-        distrb = [minlabels + p + (i < r) for i in range(nworkers)]
+        if nworkers * minlabels >= l * (minlabels - 1):
+            p, r = divmod(l - (nworkers * minlabels) % l, nworkers)
+            distrb = [minlabels + p + (i < r) for i in range(nworkers)]
+        else:
+            p, r = divmod(minlabels * l, nworkers)
+            distrb = [p + (i < r) for i in range(nworkers)]
         # distrib has k * (l * minlabels) elements
         k = sum(distrb) // (l * minlabels)
         tokens = {label: k * minlabels for label in labels}
     else:
         distrb = [minlabels for _ in range(nworkers)]
-        total_distrb = sum(distrb)
         # number of labels which are not in the distribution
-        k = len(labels) - total_distrb % len(labels)
-        low_labels = random.sample(labels, k)
-        tokens = {label: minlabels - (label in low_labels) for label in labels}
+        p, r = divmod(minlabels * (l - minlabels), 10)
+        low_labels = random.sample(labels, r)
+        tokens = {label: minlabels - p - (label in low_labels) for label in labels}
     clabels = copy.copy(labels)
 
     def random_label():

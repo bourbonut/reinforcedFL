@@ -20,7 +20,7 @@ def test_check_data():
 
 
 def test_iid_label():
-    labels = iid.label(7, list(datatrain.class_to_idx.values()))
+    labels = iid.label(nworkers, list(datatrain.class_to_idx.values()))
     assert all((len(list(datatrain.class_to_idx.values())) == len(x) for x in labels))
 
 
@@ -31,11 +31,11 @@ def test_iid_divide():
 
 def test_iid_volume():
     labels = list(datatrain.class_to_idx.values())
-    distrb = iid.label(7, labels)
+    distrb = iid.label(nworkers, labels)
     result = iid.volume(distrb, datatrain, labels)
     result = list(result.values())
     assert len(result) == len(labels)
-    assert all(len(result[i]) == 7 for i in range(len(result)))
+    assert all(len(result[i]) == nworkers for i in range(len(result)))
     indices = set()
     for idcs in result:
         for elements in idcs:
@@ -46,7 +46,7 @@ def test_iid_volume():
 
 
 def test_noniid_label_unbalanced():
-    labels = noniid.label(7, list(datatrain.class_to_idx.values()), 3)
+    labels = noniid.label(nworkers, list(datatrain.class_to_idx.values()), 3)
     s = set()
     for label in labels:
         s = s.union(label)
@@ -55,7 +55,7 @@ def test_noniid_label_unbalanced():
 
 
 def test_noniid_label_balanced():
-    labels = noniid.label(7, list(datatrain.class_to_idx.values()), 3, True)
+    labels = noniid.label(nworkers, list(datatrain.class_to_idx.values()), 3, True)
     s = set()
     for label in labels:
         s = s.union(label)
@@ -65,7 +65,7 @@ def test_noniid_label_balanced():
 
 def test_noniid_volume():
     labels = list(datatrain.class_to_idx.values())
-    distrb = noniid.label(7, labels, 3, True)
+    distrb = noniid.label(nworkers, labels, 3, True)
     result = noniid.volume(distrb, datatrain, labels)
     result = list(result.values())
     assert len(result) == len(labels)
@@ -77,7 +77,7 @@ def test_noniid_volume():
         assert len(sidcs.intersection(indices)) == 0
         indices = indices.union(sidcs)
 
-
+@pytest.mark.slow
 def test_generate_IID():
     wk_data_path = data_path_key("MNIST", "IID", nworkers) / "workers"
     create(wk_data_path)
@@ -93,7 +93,7 @@ def test_generate_IID():
         assert len(tr_extracted_labels) == ref
         assert len(te_extracted_labels) == ref
 
-
+@pytest.mark.slow
 def test_generate_nonIID_label_balanced():
     nworkers = 7
     wk_data_path = data_path_key("MNIST", "nonIID-label-balanced", nworkers) / "workers"
@@ -110,7 +110,7 @@ def test_generate_nonIID_label_balanced():
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
 
-
+@pytest.mark.slow
 def test_generate_nonIID_label_unbalanced():
     nworkers = 7
     wk_data_path = (
@@ -129,7 +129,7 @@ def test_generate_nonIID_label_unbalanced():
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
 
-
+@pytest.mark.slow
 def test_generate_nonIID_volume():
     nworkers = 7
     wk_data_path = data_path_key("MNIST", "nonIID-volume", nworkers) / "workers"
@@ -138,7 +138,7 @@ def test_generate_nonIID_volume():
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
 
-
+@pytest.mark.slow
 def test_generate_nonIID():
     nworkers = 7
     wk_data_path = data_path_key("MNIST", "nonIID", nworkers) / "workers"
@@ -156,7 +156,7 @@ def test_generate_nonIID():
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
 
-
+@pytest.mark.slow
 def test_open_dataset():
     nodes_data_path = data_path_key("MNIST", "IID", nworkers) / "workers"
     if nodes_data_path.exists():

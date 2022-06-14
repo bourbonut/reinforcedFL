@@ -20,6 +20,10 @@ ROUNDS = 10
 EPOCHES = 3
 ON_GPU = True
 PARTITION_TYPE = "nonIID"
+label_distrb = "noniid"
+volume_distrb = "noniid"
+minlabels = 3
+balanced = True
 
 if ON_GPU:
     from core.sequential_gpu import train, evaluate
@@ -43,7 +47,7 @@ size_testdata = len(datatest)  # for aggregation
 
 # Get path of data for workers and generate them
 print("Generate data for workers", end="")
-wk_data_path = data_path_key("MNIST", "nonIID", NWORKERS) / "workers"
+wk_data_path = EXP_PATH / tracker(NWORKERS, label_distrb, volume_distrb, minlabels, balanced)
 if not (wk_data_path.exists()):
     create(wk_data_path)
     generate(
@@ -51,10 +55,10 @@ if not (wk_data_path.exists()):
         datatrain,
         datatest,
         NWORKERS,
-        label_distrb="noniid",
-        volume_distrb="noniid",
-        minlabels=3,
-        balanced=False,
+        label_distrb=label_distrb,
+        volume_distrb=volume_distrb,
+        minlabels=minlabels,
+        balanced=balanced,
         save2png=True,
     )
     print(" ->[bold green] OK")
