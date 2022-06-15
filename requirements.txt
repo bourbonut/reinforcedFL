@@ -3,3 +3,4 @@ gym==0.21.0
 numpy==1.19.5
 pygal>=3.0.0
 rich-cli>=1.2.2
+cairosvg>=2.5.2

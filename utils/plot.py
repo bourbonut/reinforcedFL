@@ -1,4 +1,5 @@
 import pygal
+import cairosvg
 
 
 def lineXY(y, filename, x=None, title="", **kwargs):
@@ -28,6 +29,7 @@ def lineXY(y, filename, x=None, title="", **kwargs):
         raise TypeError("`y` must be a `dict` or a `list`.")
     line_chart.render_to_png(str(filename))
 
+
 def stacked(x, y_stacked, filename, title="", **kwargs):
     """
     Save a stacked chart
@@ -44,3 +46,24 @@ def stacked(x, y_stacked, filename, title="", **kwargs):
     for serie in y_stacked:
         bar_chart.add(serie, y_stacked[serie])
     bar_chart.render_to_png(str(filename))
+
+
+def chart(x, y, title="", **kwargs):
+    """
+    Return a line chart
+
+    Parameters:
+        x (list):       x values
+        y (dict):       y values
+        title (str):    title of the chart
+    """
+    line_chart = pygal.Line(**kwargs)
+    line_chart.title = title
+    line_chart.x_labels = map(str, x)
+    for serie in y:
+        line_chart.add(serie, y[serie])
+    return line_chart
+
+
+def topng(chart, **kwargs):
+    return cairosvg.svg2png(bytestring=chart.render(**kwargs))

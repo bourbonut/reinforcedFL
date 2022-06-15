@@ -13,8 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NWORKERS = 4
 ROUNDS = 10
 EPOCHS = 3
-ON_GPU = True
-PARTITION_TYPE = "nonIID"
+ON_GPU = False
 label_distrb = "noniid"
 volume_distrb = "noniid"
 minlabels = 3
@@ -28,12 +27,12 @@ else:
 st.header("Federated Reinforcement Learning")
 st.subheader("Informations")
 st.markdown(
-    "This experiment is going to run on {} with **{} rounds** with **{} workers** which are going to be trained on **{} epochs**.".format(
+    "This experiment is going to run on **{}** with **{} rounds** with **{} workers** which are going to be trained on **{} epochs**.".format(
         "GPU" if ON_GPU else "CPU (multithreading)", ROUNDS, NWORKERS, EPOCHS
     )
 )
 msg = (
-    "and "
+    " and "
     + ("**balanced**" if balanced else "**unbalanced**")
     + (
         " with an average of {} labels per worker".format(minlabels)
@@ -51,7 +50,7 @@ with st.spinner("Opening the dataset"):
         root="data", train=True, download=isdownloaded, transform=ToTensor()
     )
     datatest = datasets.MNIST(root="data", train=False, transform=ToTensor())
-st.success("OK")
+st.success("Dataset opened.")
 
 nclasses = len(datatrain.classes)  # for the model
 size_traindata = len(datatrain)  # for aggregation
@@ -78,9 +77,9 @@ with st.spinner("Generate data for workers"):
             save2png=True,
         )
 if exists:
-    st.success("OK")
+    st.success("Data for workers are generated successfully.")
 else:
-    st.success("Already done")
+    st.success("Data for workers are already generated.")
 
 # Experiment path
 exp_path = iterate(EXP_PATH)
@@ -90,7 +89,7 @@ with st.spinner("Initialization of the server"):
     server = FederatedAveraging(
         ModelMNIST(nclasses).to(device), size_traindata, size_testdata
     )
-st.success("OK")
+st.success("The server is successfully initialized.")
 # Initialization of workers
 with st.spinner("Initialization of the workers"):
     models = (ModelMNIST(nclasses) for _ in range(4))
@@ -98,7 +97,7 @@ with st.spinner("Initialization of the workers"):
         Node(model.to(device), wk_data_path / "worker-{}.pkl".format(i + 1))
         for i, model in enumerate(models)
     )
-st.success("OK")
+st.success("Workers are successfully initialized.")
 
 # Plot stacked chart
 st.image(str(wk_data_path / "distribution.png"))
@@ -117,7 +116,17 @@ for r in range(ROUNDS):
     avg_acc = server.global_accuracy(accuracies)
     global_accs.append(avg_acc)
     with placeholder:
-        st.line_chart(global_accs)
+        st.image(
+            topng(
+                chart(
+                    range(1, len(global_accs) + 1),
+                    {"Average of local accuracies": global_accs},
+                    title="Evolution of accuracies per round",
+                    x_title="Rounds",
+                    y_title="Accuracy (in %)",
+                )
+            )
+        )
 
     # Training loop of workers
     for e in range(EPOCHS):
