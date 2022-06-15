@@ -2,33 +2,47 @@ from utils import *
 from core import *
 from torchvision import datasets
 from torchvision.transforms import ToTensor
-from model4FL.mnist import ModelMNIST, extras
+import model4FL
 import pickle, torch
 import streamlit as st
 from itertools import starmap
+import json
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Parameters
-NWORKERS = 4
-ROUNDS = 10
-EPOCHS = 3
-ON_GPU = False
-label_distrb = "noniid"
-volume_distrb = "noniid"
-minlabels = 3
-balanced = True
+with open(ROOT_PATH / args.configuration, "r") as file:
+    parameters = json.load(file)
 
-if ON_GPU:
+ROUNDS = parameters["rounds"]
+NWORKERS = parameters["nworkers"]
+EPOCHS = parameters["epochs"]
+volume_distrb = parameters["volume_distrb"]
+label_distrb = parameters["label_distrb"]
+minlabels = parameters.get("minlabels", 3)
+balanced = parameters.get("balanced", True)
+
+# Loading model, optimizer (in extras)
+if hasattr(model4FL, parameters["model"]):
+    module = getattr(model4FL, parameters["model"])
+    Model = getattr(module, "Model")
+    extras = getattr(module, "extras")
+else:
+    raise ImportError(
+        "Not found '{}' module in 'model4FL' module".format(parameters["model"])
+    )
+
+if args.gpu:
     from core.sequential_gpu import train, evaluate
 else:
     from core.parallel import train, evaluate
 
+# Introduction
 st.header("Federated Reinforcement Learning")
 st.subheader("Informations")
 st.markdown(
     "This experiment is going to run on **{}** with **{} rounds** with **{} workers** which are going to be trained on **{} epochs**.".format(
-        "GPU" if ON_GPU else "CPU (multithreading)", ROUNDS, NWORKERS, EPOCHS
+        "GPU" if args.gpu else "CPU (multithreading)", ROUNDS, NWORKERS, EPOCHS
     )
 )
 msg = (
@@ -45,11 +59,7 @@ st.markdown("The distribution of **volume** is **{}**.".format(volume_distrb))
 
 # Get the dataset
 with st.spinner("Opening the dataset"):
-    isdownloaded = not (DATA_PATH.exists())
-    datatrain = datasets.MNIST(
-        root="data", train=True, download=isdownloaded, transform=ToTensor()
-    )
-    datatest = datasets.MNIST(root="data", train=False, transform=ToTensor())
+    datatrain, datatest = dataset(parameters["dataset"])
 st.success("Dataset opened.")
 
 nclasses = len(datatrain.classes)  # for the model
@@ -60,10 +70,10 @@ size_testdata = len(datatest)  # for aggregation
 wk_data_path = EXP_PATH / tracker(
     NWORKERS, label_distrb, volume_distrb, minlabels, balanced
 )
-exists = False
+exists = True
 with st.spinner("Generate data for workers"):
-    if not (wk_data_path.exists()):
-        exists = True
+    if not (wk_data_path.exists()) or args.refresh:
+        exists = False
         create(wk_data_path)
         generate(
             wk_data_path,
@@ -77,9 +87,9 @@ with st.spinner("Generate data for workers"):
             save2png=True,
         )
 if exists:
-    st.success("Data for workers are generated successfully.")
-else:
     st.success("Data for workers are already generated.")
+else:
+    st.success("Data for workers are generated successfully.")
 
 # Experiment path
 exp_path = iterate(EXP_PATH)
@@ -87,12 +97,12 @@ exp_path = iterate(EXP_PATH)
 # Initialization of the server
 with st.spinner("Initialization of the server"):
     server = FederatedAveraging(
-        ModelMNIST(nclasses).to(device), size_traindata, size_testdata
+        Model(nclasses).to(device), size_traindata, size_testdata
     )
 st.success("The server is successfully initialized.")
 # Initialization of workers
 with st.spinner("Initialization of the workers"):
-    models = (ModelMNIST(nclasses) for _ in range(4))
+    models = (Model(nclasses) for _ in range(4))
     workers = tuple(
         Node(model.to(device), wk_data_path / "worker-{}.pkl".format(i + 1))
         for i, model in enumerate(models)

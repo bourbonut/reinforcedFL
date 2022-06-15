@@ -6,13 +6,13 @@ from torch import optim
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class ModelMNIST(nn.Module):
+class Model(nn.Module):
     """
     Neural network for MNIST dataset
     """
 
     def __init__(self, nclasses):
-        super(ModelMNIST, self).__init__()
+        super(Model, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=(3, 3))
         self.conv2 = nn.Conv2d(32, 64, kernel_size=(3, 3))
         self.maxp2d = nn.MaxPool2d((2, 2))
