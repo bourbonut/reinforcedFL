@@ -130,8 +130,8 @@ for r in range(ROUNDS):
             topng(
                 chart(
                     range(1, len(global_accs) + 1),
-                    {"Average of local accuracies": global_accs},
-                    title="Evolution of accuracies per round",
+                    {"Average accuracy": global_accs},
+                    title="Evolution of the average accuracy per round",
                     x_title="Rounds",
                     y_title="Accuracy (in %)",
                 )
@@ -151,3 +151,5 @@ for r in range(ROUNDS):
 
 with open(exp_path / "result.pkl", "wb") as file:
     pickle.dump(global_accs, file)
+
+st.balloons()

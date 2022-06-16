@@ -74,6 +74,8 @@ def generate(
         wktrain_indices = reduce(add, indices_per_labels)
         # Worker testing indices
         wktest_indices = reduce(add, map(test_pickup, worker_labels))
+        random.shuffle(wktrain_indices)
+        random.shuffle(wktest_indices)
 
         # Generate data
         worker_data = [
