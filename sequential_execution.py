@@ -39,23 +39,8 @@ else:
 
 # Introduction
 st.header("Federated Reinforcement Learning")
-st.subheader("Informations")
-st.markdown(
-    "This experiment is going to run on **{}** with **{} rounds** with **{} workers** which are going to be trained on **{} epochs**.".format(
-        "GPU" if args.gpu else "CPU (multithreading)", ROUNDS, NWORKERS, EPOCHS
-    )
-)
-msg = (
-    " and "
-    + ("**balanced**" if balanced else "**unbalanced**")
-    + (
-        " with an average of {} labels per worker".format(minlabels)
-        if label_distrb == "noniid"
-        else ""
-    )
-)
-st.markdown("The distribution of **labels** is **{}**{}.".format(label_distrb, msg))
-st.markdown("The distribution of **volume** is **{}**.".format(volume_distrb))
+st.subheader("Information")
+st.table({key.title(): [str(parameters[key]).upper()] for key in parameters})
 
 # Get the dataset
 with st.spinner("Opening the dataset"):
@@ -87,7 +72,7 @@ with st.spinner("Generate data for workers"):
             save2png=True,
         )
 if exists:
-    st.success("Data for workers are already generated.")
+    st.warning("Data for workers are already generated.")
 else:
     st.success("Data for workers are generated successfully.")
 
