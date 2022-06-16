@@ -24,8 +24,9 @@ testloader = torch.utils.data.DataLoader(
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 nclasses = len(mnist_dataset["training"].classes)
-model = ModelMNIST(nclasses).to(device)
+model = Model(nclasses).to(device)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def test_forward():
     sample, _ = mnist_dataset["training"][0]
@@ -33,15 +34,11 @@ def test_forward():
 
 
 def test_loss():
-    sample, label = mnist_dataset["training"][0]
-    prediction = model(sample.unsqueeze(0))
-    loss_class = extras["loss"]
+    i, (sample, label) = next(enumerate(trainloader))
+    prediction = model(sample)
+    criterion = extras["criterion"]()
 
-    label_probas = torch.tensor(
-        [1 if i == label else 0 for i in range(10)], dtype=torch.float
-    ).unsqueeze(0)
-    criterion = loss_class()
-    loss = criterion(prediction, label_probas)
+    loss = criterion(prediction, label.to(device))
 
 
 def test_backpropagation():
@@ -50,7 +47,7 @@ def test_backpropagation():
     optimizer = extras["optimizer"](model.parameters())
 
     criterion = extras["criterion"]()
-    loss = criterion(prediction, labels)
+    loss = criterion(prediction, labels.to(device))
 
     optimizer.zero_grad()
     loss.backward()
@@ -72,7 +69,7 @@ def test_train():
             total = 0
             for i, (samples, labels) in enumerate(trainloader):
                 predictions = model(samples)
-                loss = criterion(predictions, labels)
+                loss = criterion(predictions, labels.to(device))
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -80,7 +77,7 @@ def test_train():
 
                 _, predicted = torch.max(predictions.data, 1)
                 total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+                correct += (predicted == labels.to(device)).sum().item()
 
                 progress.advance(task)
                 progress.refresh()
