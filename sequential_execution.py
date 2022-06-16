@@ -1,4 +1,5 @@
 from utils import *
+from utils.parser import args
 from core import *
 from torchvision import datasets
 from torchvision.transforms import ToTensor

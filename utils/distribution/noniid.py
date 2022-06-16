@@ -21,8 +21,12 @@ def label(nworkers, labels, minlabels, balanced=False):
     if balanced:
         # number of labels to be added on workers
         if nworkers * minlabels >= l * (minlabels - 1):
-            p, r = divmod(l - (nworkers * minlabels) % l, nworkers)
-            distrb = [minlabels + p + (i < r) for i in range(nworkers)]
+            d = (nworkers * minlabels) % l
+            if d == 0:
+                distrb = [minlabels for i in range(nworkers)]
+            else:
+                p, r = divmod(l - (nworkers * minlabels) % l, nworkers)
+                distrb = [minlabels + p + (i < r) for i in range(nworkers)]
         else:
             p, r = divmod(minlabels * l, nworkers)
             distrb = [p + (i < r) for i in range(nworkers)]

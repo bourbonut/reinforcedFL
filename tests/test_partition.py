@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 import pickle, pytest
 
 create(EXP_PATH)
-nworkers = 4
+nworkers = 50
 isdownloaded = not (DATA_PATH.exists())
 mnist_dataset = {}
 datatrain = datasets.MNIST(
@@ -60,7 +60,7 @@ def test_noniid_label_balanced():
     for label in labels:
         s = s.union(label)
     assert len(s) == len(list(datatrain.class_to_idx.values()))
-    assert any(len(label) != 3 for label in labels)
+    assert any(len(label) >= 3 for label in labels)
 
 
 def test_noniid_volume():
