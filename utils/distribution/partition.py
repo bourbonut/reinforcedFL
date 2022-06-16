@@ -90,7 +90,7 @@ def generate(
         name_file = "worker-" + str(k + 1) + ".pkl"
         with open(path / name_file, "wb") as file:
             pickle.dump(worker_data, file)
-        print("Data for node {} saved".format(k + 1))
+        print("Data for worker {} saved".format(k + 1))
 
     if save2png:
         stacked(
