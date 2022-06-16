@@ -53,7 +53,7 @@ size_testdata = len(datatest)  # for aggregation
 
 # Get path of data for workers and generate them
 wk_data_path = EXP_PATH / tracker(
-    NWORKERS, label_distrb, volume_distrb, minlabels, balanced
+    parameters["dataset"], NWORKERS, label_distrb, volume_distrb, minlabels, balanced
 )
 exists = True
 with st.spinner("Generate data for workers"):
