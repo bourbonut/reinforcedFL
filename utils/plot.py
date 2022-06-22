@@ -40,7 +40,7 @@ def stacked(x, y_stacked, filename, title="", **kwargs):
        filename (str):      name of the file or full path
        title (str):         title of the chart
     """
-    bar_chart = pygal.StackedBar()
+    bar_chart = pygal.StackedBar(**kwargs)
     bar_chart.title = title
     bar_chart.x_labels = map(str, x)
     for serie in y_stacked:
