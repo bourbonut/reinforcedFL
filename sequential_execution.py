@@ -97,7 +97,7 @@ if clicked:
     st.success("The server is successfully initialized.")
     # Initialization of workers
     with st.spinner("Initialization of the workers"):
-        models = (Model(nclasses) for _ in range(4))
+        models = (Model(nclasses) for _ in range(NWORKERS))
         workers = tuple(
             Node(model.to(device), wk_data_path / "worker-{}.pkl".format(i + 1))
             for i, model in enumerate(models)
