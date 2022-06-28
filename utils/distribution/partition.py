@@ -17,8 +17,15 @@ class WorkerDataset(torch.utils.data.Dataset):
     Simple class for local dataset
     """
 
-    def __init__(self, data):
+    def __init__(self, labels, data):
         self.data = data
+        self.labels = labels
+        # To get easier samples per label
+        self.classified = {label: [] for label in labels}
+        for sample, label in data:
+            self.classified[label].append(sample)
+        # Number of samples per label
+        self.amount = {label: len(self.classified[label]) for label in self.classified}
 
     def __len__(self):
         return len(self.data)
@@ -79,8 +86,8 @@ def generate(
 
         # Generate data
         worker_data = [
-            WorkerDataset([datatrain[i] for i in wktrain_indices]),
-            WorkerDataset([datatest[i] for i in wktest_indices]),
+            WorkerDataset(worker_labels, [datatrain[i] for i in wktrain_indices]),
+            WorkerDataset(worker_labels, [datatest[i] for i in wktest_indices]),
         ]
 
         if save2png:  # y_stacked of the function `stacked`
