@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader
 from torch import optim, nn
-import pickle, torch
+import pickle, torch, statistics
 from utils.plot import lineXY
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -72,9 +72,10 @@ class Worker:
             attrbs.update({"x_title": "Steps", "y_title": "Loss values"})
             lineXY({"Losses": losses}, filename, **attrbs)
 
-    def evaluate(self, train=False, label=None):
+    def _evaluate(self, train=False, label=None):
         """
         Compute the accuracy on the local data given the parameters
+        See `evaluate` for global usage
 
         Parameters
 
@@ -102,3 +103,23 @@ class Worker:
             total += labels.size(0)
             correct += (predicted == labels.to(device)).sum().item()
         return n * correct / total
+
+    def evaluate(self, train=False, perlabel=False):
+        """
+        Compute the accuracy on the local data given the parameters
+
+        Parameters
+
+            train (bool):
+                True for evaluation on data for training else
+                for evaluation on data for testing
+            perlabel (bool):
+                The evaluation is done label per label if it is True
+                which means the accuracy is computed as the average of
+                the accuracies per label
+        """
+        if perlabel:
+            labels = self._train.labels if train else self._test.labels
+            return statistics.mean([self._evaluate(train, label) for label in labels])
+        else:
+            return self._evaluate(train)

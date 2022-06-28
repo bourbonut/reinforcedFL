@@ -5,6 +5,8 @@ Module which deals with :
 - Main functions for training and evaluation
 """
 
-from .evaluator.model import *
 from .federated_learning.aggregation import FederatedAveraging, EvaluatorServer
-from .federated_learning.worker import Node
+from .federated_learning.worker import Worker
+from .federated_learning import participation
+
+PARTICIPATION = {"all": participation.entirely, "randomly": participation.randomly}
