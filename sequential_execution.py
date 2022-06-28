@@ -1,29 +1,35 @@
 from utils import *
 from core import *
-from torchvision import datasets
-from torchvision.transforms import ToTensor
 import model4FL
-import pickle, torch
+import pickle, torch, json
 import streamlit as st
-from itertools import starmap
-import json
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 config_path = ROOT_PATH / "configurations"
-if not(config_path.exists()):
-    raise RuntimeError("Create a `configurations` folder. Then add json files with parameters (see README.md for more information)")
+if not config_path.exists():
+    raise RuntimeError(
+        "Create a `configurations` folder. Then add json files with parameters (see README.md for more information)"
+    )
 
-configuration = st.selectbox("Choose the configuration", tuple((file.name for file in config_path.glob('*.json'))))
+# Introduction
+st.header("Federated Reinforcement Learning")
+st.subheader("Information")
+
+configuration = st.selectbox(
+    "Choose the configuration",
+    tuple((file.name for file in config_path.glob("*.json"))),
+)
+# Parameters
+with open(config_path / configuration, "r") as file:
+    parameters = json.load(file)
+
+st.table({key.title(): [str(parameters[key]).upper()] for key in parameters})
 ON_GPU = st.checkbox("Run on GPU")
 REFRESH = st.checkbox("Refresh data distribution")
 
 clicked = st.button("Start")
 if clicked:
-    # Parameters
-    with open(config_path / configuration, "r") as file:
-        parameters = json.load(file)
-
     ROUNDS = parameters["rounds"]
     NWORKERS = parameters["nworkers"]
     EPOCHS = parameters["epochs"]
@@ -31,6 +37,8 @@ if clicked:
     label_distrb = parameters["label_distrb"]
     minlabels = parameters.get("minlabels", 3)
     balanced = parameters.get("balanced", True)
+    participation = parameters.get("participation", "all")
+    participate = PARTICIPATION.get(participation, "all")
 
     # Loading model, optimizer (in extras)
     if hasattr(model4FL, parameters["model"]):
@@ -47,11 +55,6 @@ if clicked:
     else:
         from core.parallel import train, evaluate
 
-    # Introduction
-    st.header("Federated Reinforcement Learning")
-    st.subheader("Information")
-    st.table({key.title(): [str(parameters[key]).upper()] for key in parameters})
-
     # Get the dataset
     with st.spinner("Opening the dataset"):
         datatrain, datatest = dataset(parameters["dataset"])
@@ -63,7 +66,12 @@ if clicked:
 
     # Get path of data for workers and generate them
     wk_data_path = EXP_PATH / tracker(
-        parameters["dataset"], NWORKERS, label_distrb, volume_distrb, minlabels, balanced
+        parameters["dataset"],
+        NWORKERS,
+        label_distrb,
+        volume_distrb,
+        minlabels,
+        balanced,
     )
     exists = True
     with st.spinner("Generate data for workers"):
@@ -99,7 +107,7 @@ if clicked:
     with st.spinner("Initialization of the workers"):
         models = (Model(nclasses) for _ in range(NWORKERS))
         workers = tuple(
-            Node(model.to(device), wk_data_path / "worker-{}.pkl".format(i + 1))
+            Worker(model.to(device), wk_data_path / f"worker-{i+1}.pkl")
             for i, model in enumerate(models)
         )
     st.success("Workers are successfully initialized.")
@@ -108,7 +116,7 @@ if clicked:
     st.image(str(wk_data_path / "distribution.png"))
 
     global_accs = []
-    placeholder = st.empty()
+    placeholders = [st.empty(), st.empty()]
     # Main loop
     for r in range(ROUNDS):
         # Workers download the global model
@@ -120,7 +128,7 @@ if clicked:
         accuracies = evaluate(workers)
         avg_acc = server.global_accuracy(accuracies)
         global_accs.append(avg_acc)
-        with placeholder:
+        with placeholders[0]:
             st.image(
                 topng(
                     chart(
@@ -135,7 +143,7 @@ if clicked:
 
         # Training loop of workers
         for e in range(EPOCHS):
-            curr_path = exp_path / "round{}".format(r) / "epoch{}".format(e)
+            curr_path = exp_path / f"round{r}" / f"epoch{e}"
             create(curr_path, verbose=False)
             train(workers, curr_path)
 
