@@ -1,35 +1,28 @@
 from utils.path import DATA_PATH
-from model4FL.mnist import *
+from utils import dataset
+from model4FL.mnist import Model, extras
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 import torch
 from rich.progress import Progress
 import pytest
 
-isdownloaded = not (DATA_PATH.exists())
-mnist_dataset = {}
-mnist_dataset["training"] = datasets.MNIST(
-    root="data", train=True, download=isdownloaded, transform=ToTensor()
-)
-mnist_dataset["test"] = datasets.MNIST(root="data", train=False, transform=ToTensor())
-
+datatrain, datatest = dataset("MNIST")
 batch_size = 64
 trainloader = torch.utils.data.DataLoader(
-    mnist_dataset["training"], batch_size=batch_size, shuffle=True, num_workers=2
+    datatrain, batch_size=batch_size, shuffle=True, num_workers=2
 )
 
 testloader = torch.utils.data.DataLoader(
-    mnist_dataset["test"], batch_size=batch_size, shuffle=False, num_workers=2
+    datatest, batch_size=batch_size, shuffle=False, num_workers=2
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-nclasses = len(mnist_dataset["training"].classes)
+nclasses = len(datatrain.classes)
 model = Model(nclasses).to(device)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 def test_forward():
-    sample, _ = mnist_dataset["training"][0]
+    sample, _ = datatrain[0]
     model(sample.unsqueeze(0))
 
 
@@ -60,7 +53,7 @@ def test_train():
     optimizer = extras["optimizer"](model.parameters())
     criterion = extras["criterion"]()
 
-    size = len(mnist_dataset["training"])
+    size = len(datatrain)
     with Progress(auto_refresh=False) as progress:
         nsteps = size * num_epochs // batch_size
         task = progress.add_task("Training ...", total=nsteps)

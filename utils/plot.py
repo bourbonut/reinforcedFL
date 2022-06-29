@@ -1,6 +1,8 @@
 import pygal
 import cairosvg
+from pygal.style import Style
 
+# custom_style = Style(background="#FFFFFF", plot_background="#FFFFFF")
 
 def lineXY(y, filename, x=None, title="", **kwargs):
     """

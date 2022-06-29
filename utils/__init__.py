@@ -8,7 +8,7 @@ Module for all functions useful for :
 
 from .path import *
 from .distribution import *
-from .plot import chart, topng, lineXY
+from .plot import chart, topng
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
