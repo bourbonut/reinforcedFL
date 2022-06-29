@@ -37,3 +37,14 @@ def dataset(name):
         return datatrain, datatest
     else:
         raise RuntimeError("Dataset not found")
+
+def toplot(global_accs):
+    return topng(
+        chart(
+            range(1, max(map(len, global_accs)) + 1),
+            {"Training acc": global_accs[0], "Testing acc": global_accs[1]},
+            title="Evolution of the average accuracy per round",
+            x_title="Rounds",
+            y_title="Accuracy (in %)",
+        )
+    )

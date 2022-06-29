@@ -115,8 +115,8 @@ if clicked:
     # Plot stacked chart
     st.image(str(wk_data_path / "distribution.png"))
 
-    global_accs = []
-    placeholders = [st.empty(), st.empty()]
+    global_accs = [[], []]
+    placeholder = st.empty()
     # Main loop
     for r in range(ROUNDS):
         # Workers download the global model
@@ -127,25 +127,25 @@ if clicked:
         # on their local data
         accuracies = evaluate(workers)
         avg_acc = server.global_accuracy(accuracies)
-        global_accs.append(avg_acc)
-        with placeholders[0]:
-            st.image(
-                topng(
-                    chart(
-                        range(1, len(global_accs) + 1),
-                        {"Average accuracy": global_accs},
-                        title="Evolution of the average accuracy per round",
-                        x_title="Rounds",
-                        y_title="Accuracy (in %)",
-                    )
-                )
-            )
+        global_accs[1].append(avg_acc)
+
+        # Update the line chart for testing average accuracy
+        with placeholder:
+            st.image(toplot(global_accs))
 
         # Training loop of workers
         for e in range(EPOCHS):
             curr_path = exp_path / f"round{r}" / f"epoch{e}"
             create(curr_path, verbose=False)
             train(workers, curr_path)
+
+        accuracies = evaluate(workers, True)
+        avg_acc = server.global_accuracy(accuracies, True)
+        global_accs[0].append(avg_acc)
+
+        # Update the line chart for training average accuracy
+        with placeholder:
+            st.image(toplot(global_accs))
 
         # Server downloads all local updates
         for worker in workers:

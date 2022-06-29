@@ -12,6 +12,8 @@ class EvaluatorServer(ReinforceAgent):
         ReinforceAgent.__init__(self, *args, **kwargs)
         self.global_model = global_model
         self.workers_updates = []
+        self.delta = 0
+
 
     def send(self):
         """
@@ -71,8 +73,9 @@ class FederatedAveraging:
             target_param.data.copy_(param.data)
         self.workers_updates.clear()
 
-    def global_accuracy(self, workers_accuracies):
+    def global_accuracy(self, workers_accuracies, train=False):
         """
         Compute the global accuracy based on the Federated Averaging algorithm
         """
-        return sum(workers_accuracies) / self.t
+        size = self.n if train else self.t
+        return sum(workers_accuracies) / size
