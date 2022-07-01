@@ -3,6 +3,7 @@ from core import *
 import model4FL
 import pickle, torch, json
 import streamlit as st
+from core.federated_learning import aggregation, worker
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -33,6 +34,8 @@ if clicked:
     ROUNDS = parameters["rounds"]
     NWORKERS = parameters["nworkers"]
     EPOCHS = parameters["epochs"]
+    server_class = getattr(aggregation, parameters.get("server", "FederatedAveraging"))
+    worker_class = getattr(worker, parameters.get("worker", "Worker"))
     volume_distrb = parameters["volume_distrb"]
     label_distrb = parameters["label_distrb"]
     minlabels = parameters.get("minlabels", 3)
@@ -99,15 +102,16 @@ if clicked:
 
     # Initialization of the server
     with st.spinner("Initialization of the server"):
-        server = FederatedAveraging(
+        server = server_class(
             Model(nclasses).to(device), size_traindata, size_testdata
         )
     st.success("The server is successfully initialized.")
+
     # Initialization of workers
     with st.spinner("Initialization of the workers"):
         models = (Model(nclasses) for _ in range(NWORKERS))
         workers = tuple(
-            Worker(model.to(device), wk_data_path / f"worker-{i+1}.pkl")
+            worker_class(model.to(device), wk_data_path / f"worker-{i+1}.pkl")
             for i, model in enumerate(models)
         )
     st.success("Workers are successfully initialized.")

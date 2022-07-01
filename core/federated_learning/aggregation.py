@@ -1,19 +1,83 @@
 from core.evaluator.model import ReinforceAgent
+from collections import deque
+from itertools import compress
+import torch
+
+
+class MovingBatch:
+    """
+    Class which deals with a "moving array"
+    
+    Example with a capacity of 4
+    `|` represents a value
+
+      n  n + 1  n + 2  n + 3  n + 4
+    [ |    |      |      |    ]
+    [ |    |      |      |    ]  round t
+    [ |    |      |      |    ]
+    --------------------------------------------
+        [  |      |      |      |  ]
+    --->[  |      |      |      |  ] round t + 1
+        [  |      |      |      |  ]
+    """
+    def __init__(self, capacity):
+        self.rewards = deque([], maxlen=capacity)
+        self.states = deque([], maxlen=capacity)
+        self.actions = deque([], maxlen=capacity)
+        self.size = 0
+        self.capacity = capacity
+
+    def totorch(self):
+        states = torch.FloatTensor(self.states)
+        rewards = torch.FloatTensor(self.rewards)
+        actions = torch.LongTensor([self.actions]).T
+        return states, rewards, actions
+
+    def update_size(self):
+        self.size = min(self.capacity, self.size + 1)
+
+    def isfull(self):
+        return self.capacity == self.size
+
 
 # WARNING: Class not finished
-class EvaluatorServer(ReinforceAgent):
+class EvaluatorServer:
     """
     This class is based on the `REINFORCE` algorithm class from
     the evaluator module (`core.evaluator`) for a better aggregation
     (see the algorithm `FRCCE` - `arXiv:2102.13314v1`)
     """
 
-    def __init__(self, global_model, *args, **kwargs):
-        ReinforceAgent.__init__(self, *args, **kwargs)
+    def __init__(
+        self,
+        global_model,
+        ninput,
+        noutput,
+        capacity=3,
+        gamma=0.99,
+        window=3,
+        optimizer=None,
+        *args,
+        **kwargs
+    ):
         self.global_model = global_model
+        self.agent = ReinforceAgent(ninput, noutput)
+        self.optimizer = (
+            torch.optim.Adam(self.agent.parameters(), lr=0.01)
+            if optimizer is None
+            else optimizer
+        )
         self.workers_updates = []
-        self.delta = 0
-
+        self.gamma = gamma
+        self.delta = 0  # Window for exponential moving average
+        self.accuracies = []  # accuracies during training of task model
+        self.window = window  # window for weighting moving average
+        self.rewards = []
+        self.capacity = capacity
+        self.batchs = MovingBatch(capacity)
+        self.total_rewards = []
+        # self.trainamount = []
+        # self.testamount = []
 
     def send(self):
         """
@@ -26,6 +90,67 @@ class EvaluatorServer(ReinforceAgent):
         The server collects local model parameters through this method
         """
         self.workers_updates.append(workers_update)
+
+    # def federated_analytic(self, workers):
+    #     """
+    #     Simulated Federated Analytic. The number of samples per label
+    #     on each worker are gathered.
+    #     """
+    #     self.trainamount = [worker._train.amount for worker in workers]
+    #     self.testamount = [worker._test.amount for worker in workers]
+
+    def discount_rewards(self):
+        r = torch.tensor([self.gamma**i * rw for i, rw in enumerate(self.rewards)])
+        r = r.flip(0).cumsum(0).flip(0)
+        return (r - r.mean())[-1]
+
+    def update_batch(self, state, action):
+        self.batchs.rewards.append(self.discount_rewards())
+        self.batchs.states.append(state)
+        self.batchs.actions.append(action)
+        self.batchs.update_size()
+
+    def update(self, state, done):
+        """
+        Update the global model and the agent policy
+        """
+        # Selection of gradients which are going
+        # to participate to the next aggregation
+        probas = self.agent.forward(state)
+        selection = action = torch.bernouilli(probas).tolist()
+        p = sum(selection)  # number of participants
+        participants = compress(self.workers_updates, selection)
+
+        # Update the global model
+        new_weights = map(lambda layer: sum(layer) / p, zip(*participants))
+        for target_param, param in zip(self.global_model.parameters(), new_weights):
+            target_param.data.copy_(param.data)
+        self.workers_updates.clear()
+
+        # Compute the reward
+        curr_accuracy = sum(state) / p
+        reward = curr_accuracy - self.delta
+        self.rewards.append(reward)
+
+        # Update batch array
+        self.update_batch(state, action)
+
+        # Optimization if batch is complete
+        if self.batchs.isfull():
+            self.optimizer.zero_grad()
+            states, rewards, actions = self.batchs.totorch()
+
+            # Calculate loss
+            logprob = torch.log(self.agent.forward(states))
+
+            selected_logprobs = rewards * torch.gather(logprob, 1, actions).squeeze()
+            loss = -selected_logprobs.mean()
+
+            loss.backward()  # Compute gradients
+            self.optimizer.step()  # Apply gradients
+
+            # Update the moving average
+            self.delta = (curr_accuracy + (self.window - 1) * self.delta) / self.window
 
 
 class FederatedAveraging:
@@ -58,6 +183,13 @@ class FederatedAveraging:
         For convenience, this method is used for communication.
         """
         self.receive(worker.send())
+
+    # def federated_analytic(self, workers):
+    #     """
+    #     Simulated Federated Analytic
+    #     Not useful for Federated Averaging
+    #     """
+    #     pass
 
     def update(self):
         """

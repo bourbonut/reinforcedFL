@@ -5,11 +5,8 @@ Functions to partition data
 import random, pickle, torch, copy
 from functools import reduce
 from operator import add
-from utils.distribution import noniid
-from utils.distribution import iid
 from utils.plot import stacked
-
-MODULES = {"iid": iid, "noniid": noniid}
+import importlib
 
 
 class WorkerDataset(torch.utils.data.Dataset):
@@ -52,8 +49,9 @@ def generate(
     assert get_nb_labels(datatrain) == get_nb_labels(datatest), msg
 
     # Load functions for distribution
-    label = MODULES[label_distrb].label
-    volume = MODULES[volume_distrb].volume
+    get = lambda distrb: importlib.import_module(f"utils.distribution.{distrb}")
+    label = getattr(get(label_distrb), "label")
+    volume = getattr(get(volume_distrb), "volume")
 
     # Values which are equal to the label of classes
     labels = list(datatrain.class_to_idx.values())
