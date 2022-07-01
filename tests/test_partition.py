@@ -1,8 +1,7 @@
 from utils import tracker, dataset
 from utils.path import create, iterate, EXP_PATH, DATA_PATH
 from utils.distribution import *
-from torchvision import datasets
-from torchvision.transforms import ToTensor
+from utils.distribution.partition import AugmentedDataset
 from torch.utils.data import DataLoader
 import pickle, pytest
 
@@ -13,6 +12,11 @@ datatrain, datatest = dataset("MNIST")
 def test_check_data():
     assert DATA_PATH.exists()
 
+def test_augmented_dataset_class():
+    augdata = AugmentedDataset(datatrain, 5)
+    assert len(augdata) == len(datatrain) * 5
+    assert augdata[0][0].size() == datatrain[0][0].size()
+    assert type(augdata[0][1]) == int
 
 def test_iid_label():
     labels = iid.label(nworkers, list(datatrain.class_to_idx.values()))

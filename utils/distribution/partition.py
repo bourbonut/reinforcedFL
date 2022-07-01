@@ -4,8 +4,9 @@ Functions to partition data
 
 import random, pickle, torch, copy
 from functools import reduce
-from operator import add
+from operator import add, itemgetter
 from utils.plot import stacked
+from utils.distribution.common import sort_per_label
 import importlib
 
 
@@ -30,6 +31,59 @@ class WorkerDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
+class AugmentedDataset(torch.utils.data.Dataset):
+    """
+    Class for augmented dataset
+    """
+
+    def __init__(self, dataset, k, noise=100):
+        """
+        Return a new dataset with same distribution
+        and k times the total size
+
+        Parameters:
+            
+            dataset (torch.utils.data.Dataset): 
+                the dataset which is going to be augmented
+
+            k (float):      the percentage for augmentation (must be greater than 1)
+            noise (int):    the amount of noise added 
+        """
+        assert k > 1, "k must be greater than 1 (e.g. `k = 1.5`)"
+        self.noise = noise
+        self.k = k
+        sorted_data=sort_per_label(dataset, key=itemgetter(1))
+        self.data = reduce(add, map(self.augment, sorted_data.values())) 
+        random.shuffle(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+    def __len__(self):
+        return len(self.data) 
+    
+    def make_noise(self, sample):
+        """
+        Add noise to the given sample
+        """
+        x, y = sample
+        noise = torch.randint(0, self.noise, x.size())
+        return [x + noise, y]
+    
+    def augment(self, samples):
+        """
+        Add random samples from the given samples, 
+        make noise on all samples and return samples
+        """
+        size = len(samples)
+        p, r = divmod(self.k, 1)
+        new_samples = (p - 1) * samples
+        augmented_size = int(r * size)
+        new_samples += random.sample(samples, augmented_size)
+        total_samples = samples + new_samples
+        # print(total_samples[0])
+        # print(type(total_samples[0]))
+        return [self.make_noise(sample) for sample in total_samples]
 
 def generate(
     path,
