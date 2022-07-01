@@ -7,7 +7,7 @@ import torch
 class MovingBatch:
     """
     Class which deals with a "moving array"
-    
+
     Example with a capacity of 4
     `|` represents a value
 
@@ -20,6 +20,7 @@ class MovingBatch:
     --->[  |      |      |      |  ] round t + 1
         [  |      |      |      |  ]
     """
+
     def __init__(self, capacity):
         self.rewards = deque([], maxlen=capacity)
         self.states = deque([], maxlen=capacity)
@@ -76,8 +77,6 @@ class EvaluatorServer:
         self.capacity = capacity
         self.batchs = MovingBatch(capacity)
         self.total_rewards = []
-        # self.trainamount = []
-        # self.testamount = []
 
     def send(self):
         """
@@ -90,14 +89,6 @@ class EvaluatorServer:
         The server collects local model parameters through this method
         """
         self.workers_updates.append(workers_update)
-
-    # def federated_analytic(self, workers):
-    #     """
-    #     Simulated Federated Analytic. The number of samples per label
-    #     on each worker are gathered.
-    #     """
-    #     self.trainamount = [worker._train.amount for worker in workers]
-    #     self.testamount = [worker._test.amount for worker in workers]
 
     def discount_rewards(self):
         r = torch.tensor([self.gamma**i * rw for i, rw in enumerate(self.rewards)])
@@ -183,13 +174,6 @@ class FederatedAveraging:
         For convenience, this method is used for communication.
         """
         self.receive(worker.send())
-
-    # def federated_analytic(self, workers):
-    #     """
-    #     Simulated Federated Analytic
-    #     Not useful for Federated Averaging
-    #     """
-    #     pass
 
     def update(self):
         """
