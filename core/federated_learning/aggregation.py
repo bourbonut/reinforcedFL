@@ -29,15 +29,25 @@ class MovingBatch:
         self.capacity = capacity
 
     def totorch(self):
+        """
+        Return three tensors namely states, rewards and actions
+        """
         states = torch.FloatTensor(self.states)
         rewards = torch.FloatTensor(self.rewards)
         actions = torch.LongTensor([self.actions]).T
         return states, rewards, actions
 
     def update_size(self):
+        """
+        Add 1 to the size attribute (maximum: capacity)
+        """
         self.size = min(self.capacity, self.size + 1)
 
     def isfull(self):
+        """
+        Return True if the batch is full (to start the
+        learning process)
+        """
         return self.capacity == self.size
 
 
@@ -66,7 +76,7 @@ class EvaluatorServer:
         self.optimizer = (
             torch.optim.Adam(self.agent.parameters(), lr=0.01)
             if optimizer is None
-            else optimizer
+            else optimizer(self.agent.parameters())
         )
         self.workers_updates = []
         self.gamma = gamma

@@ -31,6 +31,7 @@ REFRESH = st.checkbox("Refresh data distribution")
 
 clicked = st.button("Start")
 if clicked:
+    NEXPS = parameters.get("nexps", 1)
     ROUNDS = parameters["rounds"]
     NWORKERS = parameters["nworkers"]
     EPOCHS = parameters["epochs"]
@@ -119,42 +120,45 @@ if clicked:
     # Plot stacked chart
     st.image(str(wk_data_path / "distribution.png"))
 
+    # Global accuracies : first list for training
+    # second list for testing
     global_accs = [[], []]
-    placeholder = st.empty()
+    placeholder = st.empty() # for streamlit
     # Main loop
-    for r in range(ROUNDS):
-        # Workers download the global model
-        for worker in workers:
-            worker.communicatewith(server)
+    for iexp in range(NEXPS):
+        for r in range(ROUNDS):
+            # Workers download the global model
+            for worker in workers:
+                worker.communicatewith(server)
 
-        # Workers evaluate accuracy of the global model
-        # on their local data
-        accuracies = evaluate(workers)
-        avg_acc = server.global_accuracy(accuracies)
-        global_accs[1].append(avg_acc)
+            # Workers evaluate accuracy of the global model
+            # on their local data
+            accuracies = evaluate(workers)
+            avg_acc = server.global_accuracy(accuracies)
+            global_accs[1].append(avg_acc)
 
-        # Update the line chart for testing average accuracy
-        with placeholder:
-            st.image(toplot(global_accs))
+            # Update the line chart for testing average accuracy
+            with placeholder:
+                st.image(toplot(global_accs))
 
-        # Training loop of workers
-        for e in range(EPOCHS):
-            curr_path = exp_path / f"round{r}" / f"epoch{e}"
-            create(curr_path, verbose=False)
-            train(workers, curr_path)
+            # Training loop of workers
+            for e in range(EPOCHS):
+                curr_path = exp_path / f"round{r}" / f"epoch{e}"
+                create(curr_path, verbose=False)
+                train(workers, curr_path)
 
-        accuracies = evaluate(workers, True)
-        avg_acc = server.global_accuracy(accuracies, True)
-        global_accs[0].append(avg_acc)
+            accuracies = evaluate(workers, True)
+            avg_acc = server.global_accuracy(accuracies, True)
+            global_accs[0].append(avg_acc)
 
-        # Update the line chart for training average accuracy
-        with placeholder:
-            st.image(toplot(global_accs))
+            # Update the line chart for training average accuracy
+            with placeholder:
+                st.image(toplot(global_accs))
 
-        # Server downloads all local updates
-        for worker in workers:
-            server.communicatewith(worker)
-        server.update()
+            # Server downloads all local updates
+            for worker in workers:
+                server.communicatewith(worker)
+            server.update()
 
     with open(exp_path / "result.pkl", "wb") as file:
         pickle.dump(global_accs, file)
