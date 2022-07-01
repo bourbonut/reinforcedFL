@@ -7,51 +7,55 @@ from core.federated_learning import aggregation, worker
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+subfolders = ["environment", "model", "distribution"]
+
 config_path = ROOT_PATH / "configurations"
-if not config_path.exists():
+if not all(((config_path / subfolder).exists() for subfolder in subfolders)):
     raise RuntimeError(
         "Create a `configurations` folder. Then add json files with parameters (see README.md for more information)"
     )
 
 # Introduction
-st.header("Federated Reinforcement Learning")
-st.subheader("Information")
+st.title("Federated Reinforcement Learning")
+st.header("Information")
 
-configuration = st.selectbox(
-    "Choose the configuration",
-    tuple((file.name for file in config_path.glob("*.json"))),
-)
-# Parameters
-with open(config_path / configuration, "r") as file:
-    parameters = json.load(file)
+parameters = {key: None for key in subfolders}
 
-st.table({key.title(): [str(parameters[key]).upper()] for key in parameters})
+for subfolder in subfolders:
+    st.subheader(subfolder.title() + " parameters")
+    path = config_path / subfolder
+    configuration = st.selectbox(
+        f'Choose the configuration for "{subfolder}"',
+        tuple((file.name for file in path.glob("*.json"))),
+    )
+
+    with open(path / configuration, "r") as file:
+        parameters[subfolder] = json.load(file)
+
+    information = parameters[subfolder]
+    st.table({key.title(): [str(information[key]).upper()] for key in information})
+
+
 ON_GPU = st.checkbox("Run on GPU")
 REFRESH = st.checkbox("Refresh data distribution")
 
 clicked = st.button("Start")
 if clicked:
-    NEXPS = parameters.get("nexps", 1)
-    ROUNDS = parameters["rounds"]
-    NWORKERS = parameters["nworkers"]
-    EPOCHS = parameters["epochs"]
-    server_class = getattr(aggregation, parameters.get("server", "FederatedAveraging"))
-    worker_class = getattr(worker, parameters.get("worker", "Worker"))
-    volume_distrb = parameters["volume_distrb"]
-    label_distrb = parameters["label_distrb"]
-    minlabels = parameters.get("minlabels", 3)
-    balanced = parameters.get("balanced", True)
-    participation = parameters.get("participation", "all")
-    participate = PARTICIPATION.get(participation, "all")
+    NEXPS = parameters["environment"].get("nexps", 1)
+    ROUNDS = parameters["environment"]["rounds"]
+    NWORKERS = parameters["environment"]["nworkers"]
+    EPOCHS = parameters["environment"]["epochs"]
+    server_class = getattr(aggregation, parameters["model"]["server_class"])
+    worker_class = getattr(worker, parameters["model"]["worker_class"])
 
     # Loading model, optimizer (in extras)
-    if hasattr(model4FL, parameters["model"]):
-        module = getattr(model4FL, parameters["model"])
+    if hasattr(model4FL, parameters["model"]["task_model"]):
+        module = getattr(model4FL, parameters["model"]["task_model"])
         Model = getattr(module, "Model")
         extras = getattr(module, "extras")
     else:
         raise ImportError(
-            "Not found '{}' module in 'model4FL' module".format(parameters["model"])
+            f"Not found \"{parameters['model']['task_model']}\" module in 'model4FL' module"
         )
 
     if ON_GPU:
@@ -60,8 +64,9 @@ if clicked:
         from core.parallel import train, evaluate
 
     # Get the dataset
+    dataname = parameters["environment"]["dataset"]
     with st.spinner("Opening the dataset"):
-        datatrain, datatest = dataset(parameters["dataset"])
+        datatrain, datatest = dataset(dataname)
     st.success("Dataset opened.")
 
     nclasses = len(datatrain.classes)  # for the model
@@ -69,14 +74,7 @@ if clicked:
     size_testdata = len(datatest)  # for aggregation
 
     # Get path of data for workers and generate them
-    wk_data_path = EXP_PATH / tracker(
-        parameters["dataset"],
-        NWORKERS,
-        label_distrb,
-        volume_distrb,
-        minlabels,
-        balanced,
-    )
+    wk_data_path = EXP_PATH / tracker(dataname, NWORKERS, **parameters["distribution"])
     exists = True
     with st.spinner("Generate data for workers"):
         if not (wk_data_path.exists()) or REFRESH:
@@ -87,11 +85,8 @@ if clicked:
                 datatrain,
                 datatest,
                 NWORKERS,
-                label_distrb=label_distrb,
-                volume_distrb=volume_distrb,
-                minlabels=minlabels,
-                balanced=balanced,
                 save2png=True,
+                **parameters["distribution"],
             )
     if exists:
         st.warning("Data for workers are already generated.")
@@ -103,16 +98,19 @@ if clicked:
 
     # Initialization of the server
     with st.spinner("Initialization of the server"):
-        server = server_class(
-            Model(nclasses).to(device), size_traindata, size_testdata
-        )
+        server = server_class(Model(nclasses).to(device), size_traindata, size_testdata)
     st.success("The server is successfully initialized.")
 
     # Initialization of workers
     with st.spinner("Initialization of the workers"):
         models = (Model(nclasses) for _ in range(NWORKERS))
+        batch_size = parameters["model"].get("batch_size", 64)
         workers = tuple(
-            worker_class(model.to(device), wk_data_path / f"worker-{i+1}.pkl")
+            worker_class(
+                model.to(device),
+                wk_data_path / f"worker-{i+1}.pkl",
+                batch_size=batch_size,
+            )
             for i, model in enumerate(models)
         )
     st.success("Workers are successfully initialized.")
@@ -123,7 +121,7 @@ if clicked:
     # Global accuracies : first list for training
     # second list for testing
     global_accs = [[], []]
-    placeholder = st.empty() # for streamlit
+    placeholder = st.empty()  # for streamlit
     # Main loop
     for iexp in range(NEXPS):
         for r in range(ROUNDS):

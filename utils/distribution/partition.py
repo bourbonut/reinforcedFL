@@ -19,9 +19,7 @@ class WorkerDataset(torch.utils.data.Dataset):
         self.data = data
         self.labels = labels
         # To get easier samples per label
-        self.classified = {label: [] for label in labels}
-        for sample, label in data:
-            self.classified[label].append(sample)
+        self.classified = sort_per_label(data, key=itemgetter(1))
         # Number of samples per label
         self.amount = {label: len(self.classified[label]) for label in self.classified}
 
@@ -81,8 +79,6 @@ class AugmentedDataset(torch.utils.data.Dataset):
         augmented_size = int(r * size)
         new_samples += random.sample(samples, augmented_size)
         total_samples = samples + new_samples
-        # print(total_samples[0])
-        # print(type(total_samples[0]))
         return [self.make_noise(sample) for sample in total_samples]
 
 def generate(
@@ -95,20 +91,45 @@ def generate(
     balanced=False,
     volume_distrb="iid",
     save2png=False,
+    k=None,
+    noise=100,
 ):
+    """
+    Generate local dataset for workers
+
+    Parameters:
+
+        path (PosixPath):       path where data of workers are saved
+        datatrain (Dataset):    dataset for training
+        datatest (Dataset):     dataset for testing
+        nworkers (int):         number of workers
+        label_distrb (str):     "iid" or "noniid"
+        minlabels (int):        See function `label` in `utils/distribution/noniid.py`
+        balanced (bool):        See function `label` in `utils/distribution/noniid.py`
+        volume_distrb (str):    "iid" or "noniid"
+        save2png (bool):        if True, save a stacked chart of the distribution
+        k (float):              if specified, k > 1 and increases the size of the dataset
+        noise (int):            for data augmentation, parameter for noise
+    """
     msg = "Training data must have the same labels as testing data"
     assert datatrain.classes == datatest.classes, msg
     msg = "Training data must have the same number of labels as testing data"
     get_nb_labels = lambda x: len(list(x.class_to_idx.values()))
     assert get_nb_labels(datatrain) == get_nb_labels(datatest), msg
 
+    # Values which are equal to the label of classes
+    labels = list(datatrain.class_to_idx.values())
+
+    # Data augmentation
+    if k is not None:
+        datatrain = AugmentedDataset(datatrain, k, noise=noise)
+        datatest = AugmentedDataset(datatest, k, noise=noise) 
+
     # Load functions for distribution
     get = lambda distrb: importlib.import_module(f"utils.distribution.{distrb}")
     label = getattr(get(label_distrb), "label")
     volume = getattr(get(volume_distrb), "volume")
 
-    # Values which are equal to the label of classes
-    labels = list(datatrain.class_to_idx.values())
     # Distribution of labels
     distrb = label(nworkers, labels, minlabels, balanced=balanced)
     # Generate training indices

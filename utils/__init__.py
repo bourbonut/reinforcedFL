@@ -12,16 +12,20 @@ from .plot import chart, topng
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 
-def tracker(dataname, nworkers, label_distrb, volume_distrb, minlabels=3, balanced=True):
+
+def tracker(
+    dataname, nworkers, label_distrb, volume_distrb, minlabels=3, balanced=True, k=None
+):
     d = dataname.lower()
     n = str(nworkers)
     v = "Vi" if volume_distrb == "iid" else "Vni"
     l = "Li" if label_distrb == "iid" else "Lni"
     b = "bal" if balanced else "unbal"
     m = "" if label_distrb == "iid" else str(minlabels)
-    return (
-        "data-" + d + "-" + "".join((n, l, m, v)) + ("-" + b if label_distrb == "noniid" else "")
-    )
+    k = "" if k is None else "-" + str(k)
+    print(k)
+    bb = "-" + b if label_distrb == "noniid" else ""
+    return "data-" + d + "-" + "".join((n, l, m, v)) + bb + k
 
 
 def dataset(name):
@@ -37,6 +41,7 @@ def dataset(name):
         return datatrain, datatest
     else:
         raise RuntimeError("Dataset not found")
+
 
 def toplot(global_accs):
     return topng(
