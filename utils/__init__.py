@@ -23,7 +23,6 @@ def tracker(
     b = "bal" if balanced else "unbal"
     m = "" if label_distrb == "iid" else str(minlabels)
     k = "" if k is None else "-" + str(k)
-    print(k)
     bb = "-" + b if label_distrb == "noniid" else ""
     return "data-" + d + "-" + "".join((n, l, m, v)) + bb + k
 
