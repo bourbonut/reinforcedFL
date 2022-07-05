@@ -62,6 +62,7 @@ else:
 
 if ON_GPU:
     from core.sequential_gpu import train, evaluate
+    console.print("The program is running on GPU")
 else:
     from core.parallel import train, evaluate
 
@@ -72,12 +73,13 @@ with Live("[cyan]Opening the dataset[/]") as live:
     live.update("[green]Dataset opened.[/]")
 
 nclasses = len(datatrain.classes)  # for the model
+# for aggregation
 size_traindata = parameters["distribution"].get("k", 1) * len(
     datatrain
-)  # for aggregation
+)
 size_testdata = parameters["distribution"].get("k", 1) * len(
     datatest
-)  # for aggregation
+)
 
 # Get path of data for workers and generate them
 wk_data_path = EXP_PATH / tracker(dataname, NWORKERS, **parameters["distribution"])
@@ -101,6 +103,10 @@ with Live("[cyan]Generate data for workers[/]") as live:
 
 # Experiment path
 exp_path = iterate(EXP_PATH)
+create(exp_path, verbose=False)
+# Save configuration
+with open(exp_path / "configuration.json", "w") as file:
+    json.dump(parameters, file)
 
 # Initialization of the server
 with Live("[cyan]Initialization of the server[/]") as live:

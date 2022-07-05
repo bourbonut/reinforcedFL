@@ -86,6 +86,7 @@ if clicked:
                 datatest,
                 NWORKERS,
                 save2png=True,
+                noise=10,
                 **parameters["distribution"],
             )
     if exists:
@@ -95,6 +96,10 @@ if clicked:
 
     # Experiment path
     exp_path = iterate(EXP_PATH)
+    create(exp_path, verbose=False)
+    # Save configuration
+    with open(exp_path / "configuration.json", "w") as file:
+        json.dump(parameters, file)
 
     # Initialization of the server
     with st.spinner("Initialization of the server"):

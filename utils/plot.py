@@ -62,8 +62,28 @@ def chart(x, y, title="", **kwargs):
     line_chart = pygal.Line(**kwargs)
     line_chart.title = title
     line_chart.x_labels = map(str, x)
-    for serie in y:
-        line_chart.add(serie, y[serie])
+    condition = False
+    if all((len(values) for values in y.values())):
+        values = tuple(y.values())
+        gap = abs(values[0][-1] - values[1][-1])
+        same = len(values[0]) == len(values[1])
+        condition = gap < 0.1 and same
+    if condition:
+        for i, serie in enumerate(y):
+            if i == 1:
+                last_value = y[serie][-1]
+                values = y[serie][:-1] + [{"value": last_value, "label": str(round(last_value, 3))}]
+                line_chart.add(serie, values)
+            else:
+                line_chart.add(serie, y[serie])
+    else:
+        for serie in y:
+            if len(y[serie])>0:
+                last_value = y[serie][-1]
+                values = y[serie][:-1] + [{"value": last_value, "label": str(round(last_value, 3))}]
+                line_chart.add(serie, values)
+            else:
+                line_chart.add(serie, y[serie])
     return line_chart
 
 

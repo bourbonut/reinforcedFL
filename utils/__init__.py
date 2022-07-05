@@ -3,7 +3,6 @@ Module for all functions useful for :
 - partitioning
 - managing path
 - plotting
-- parser
 """
 
 from .path import *
@@ -11,6 +10,7 @@ from .distribution import *
 from .plot import chart, topng
 from torchvision import datasets
 from torchvision.transforms import ToTensor
+from pygal.style import DefaultStyle
 
 
 def tracker(
@@ -50,5 +50,8 @@ def toplot(global_accs):
             title="Evolution of the average accuracy per round",
             x_title="Rounds",
             y_title="Accuracy (in %)",
+            print_labels=True,
+            margin_right = 75,
+            # style=DefaultStyle(label_font_size=8),
         )
     )
