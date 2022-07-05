@@ -70,8 +70,8 @@ if clicked:
     st.success("Dataset opened.")
 
     nclasses = len(datatrain.classes)  # for the model
-    size_traindata = len(datatrain)  # for aggregation
-    size_testdata = len(datatest)  # for aggregation
+    size_traindata = parameters["distribution"].get("k", 1) * len(datatrain)  # for aggregation
+    size_testdata = parameters["distribution"].get("k", 1) * len(datatest)  # for aggregation
 
     # Get path of data for workers and generate them
     wk_data_path = EXP_PATH / tracker(dataname, NWORKERS, **parameters["distribution"])
