@@ -1,6 +1,7 @@
 from core.evaluator.model import ReinforceAgent
 from collections import deque
 from itertools import compress
+from utils.plot import lineXY
 import torch
 
 
@@ -51,7 +52,12 @@ class MovingBatch:
         return self.capacity == self.size
 
 
-# WARNING: Class not finished
+    def clear(self):
+        self.rewards.clear()
+        self.states.clear()
+        self.actions.clear()
+        self.size = 0
+
 class EvaluatorServer:
     """
     This class is based on the `REINFORCE` algorithm class from
@@ -80,10 +86,11 @@ class EvaluatorServer:
         )
         self.workers_updates = []
         self.gamma = gamma
-        self.delta = 0  # Window for exponential moving average
+        self.delta = 0  # Window for moving average
         self.accuracies = []  # accuracies during training of task model
         self.window = window  # window for weighting moving average
         self.rewards = []
+        self.losses = []
         self.capacity = capacity
         self.batchs = MovingBatch(capacity)
         self.total_rewards = []
@@ -100,12 +107,24 @@ class EvaluatorServer:
         """
         self.workers_updates.append(workers_update)
 
+    def communicatewith(self, worker):
+        """
+        For convenience, this method is used for communication.
+        """
+        self.receive(worker.send(False))
+
     def discount_rewards(self):
+        """
+        Compute the discount reward of the current step
+        """
         r = torch.tensor([self.gamma**i * rw for i, rw in enumerate(self.rewards)])
         r = r.flip(0).cumsum(0).flip(0)
         return (r - r.mean())[-1]
 
     def update_batch(self, state, action):
+        """
+        Update MovingBatch class
+        """
         self.batchs.rewards.append(self.discount_rewards())
         self.batchs.states.append(state)
         self.batchs.actions.append(action)
@@ -146,6 +165,7 @@ class EvaluatorServer:
 
             selected_logprobs = rewards * torch.gather(logprob, 1, actions).squeeze()
             loss = -selected_logprobs.mean()
+            self.losses.append(loss.item())
 
             loss.backward()  # Compute gradients
             self.optimizer.step()  # Apply gradients
@@ -153,6 +173,19 @@ class EvaluatorServer:
             # Update the moving average
             self.delta = (curr_accuracy + (self.window - 1) * self.delta) / self.window
 
+    def reset(self, filename=None):
+        """
+        Reset working attributes
+        """
+        self.batchs.clear()
+        self.workers_updates.clear()
+        self.rewards.clear()
+        if filename is not None:
+            attrbs = {"title": "Evolution of loss function"}
+            attrbs.update({"xrange": (0, len(self.losses) - 1)})
+            attrbs.update({"x_title": "Steps", "y_title": "Loss values"})
+            lineXY({"Losses": self.losses}, filename, **attrbs)
+        self.losses.clear()
 
 class FederatedAveraging:
     """
@@ -205,3 +238,6 @@ class FederatedAveraging:
         """
         size = self.n if train else self.t
         return sum(workers_accuracies) / size
+
+    def reset(self, *args, **kwargs):
+        pass

@@ -40,11 +40,14 @@ class Worker:
         self.model.load_state_dict(parameters)
         self.optimizer = self.optim_obj(self.model.parameters())
 
-    def send(self):
+    def send(self, weighted=True):
         """
         The node sends his local model parameters through this method
         """
-        return [len(self._train) * weight for weight in self.model.parameters()]
+        if weighted:
+            return [len(self._train) * weight for weight in self.model.parameters()]
+        else:
+            return self.model.parameters()
 
     def communicatewith(self, aggregator):
         """

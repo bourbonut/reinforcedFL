@@ -62,6 +62,7 @@ else:
 
 if ON_GPU:
     from core.sequential_gpu import train, evaluate
+
     console.print("The program is running on GPU")
 else:
     from core.parallel import train, evaluate
@@ -74,12 +75,8 @@ with Live("[cyan]Opening the dataset[/]") as live:
 
 nclasses = len(datatrain.classes)  # for the model
 # for aggregation
-size_traindata = parameters["distribution"].get("k", 1) * len(
-    datatrain
-)
-size_testdata = parameters["distribution"].get("k", 1) * len(
-    datatest
-)
+size_traindata = parameters["distribution"].get("k", 1) * len(datatrain)
+size_testdata = parameters["distribution"].get("k", 1) * len(datatest)
 
 # Get path of data for workers and generate them
 wk_data_path = EXP_PATH / tracker(dataname, NWORKERS, **parameters["distribution"])
@@ -128,17 +125,19 @@ with Live("[cyan]Initialization of the workers[/]") as live:
     live.update("[green]Workers are successfully initialized.[/]")
 
 console.print("")
+
 # Global accuracies : first list for training
 # second list for testing
 global_accs = [[], []]
 # table = Table("Training accuracies", "Testing accuracies")
 table = Table()
+table.add_column("Round")
 table.add_column("Training accuracies")
 table.add_column("Testing accuracies")
 
 # Main loop
-with Live(table, auto_refresh=False) as live:
-    for iexp in range(NEXPS):
+for iexp in range(NEXPS):
+    with Live(table, auto_refresh=False) as live:
         for r in range(ROUNDS):
             # Workers download the global model
             for worker in workers:
@@ -152,22 +151,30 @@ with Live(table, auto_refresh=False) as live:
 
             # Training loop of workers
             for e in range(EPOCHS):
-                curr_path = exp_path / f"round{r}" / f"epoch{e}"
-                create(curr_path, verbose=False)
-                train(workers, curr_path)
+                # No save of loss evolution
+                # curr_path = exp_path / f"round{r}" / f"epoch{e}"
+                # create(curr_path, verbose=False)
+                # train(workers, curr_path)
+                train(workers)
 
             accuracies = evaluate(workers, True)
             avg_acc = server.global_accuracy(accuracies, True)
             global_accs[0].append(avg_acc)
 
             # Update the table for training average accuracy
-            table.add_row("{:.2%}".format(avg_acc), "{:.2%}".format(global_accs[1][-1]))
+            table.add_row(
+                str(r + 1),
+                "{:.2%}".format(avg_acc),
+                "{:.2%}".format(global_accs[1][-1]),
+            )
             live.refresh()
 
             # Server downloads all local updates
             for worker in workers:
                 server.communicatewith(worker)
             server.update()
+
+    server.reset()
 
 with open(exp_path / "result.pkl", "wb") as file:
     pickle.dump(global_accs, file)
