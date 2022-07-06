@@ -107,7 +107,7 @@ with open(exp_path / "configuration.json", "w") as file:
 
 # Initialization of the server
 with Live("[cyan]Initialization of the server[/]") as live:
-    server = server_class(Model(nclasses).to(device), size_traindata, size_testdata)
+    server = server_class(Model(nclasses).to(device), size_traindata, size_testdata, **parameters["model"])
     live.update("[green]The server is successfully initialized.[/green]")
 
 # Initialization of workers
@@ -130,13 +130,13 @@ console.print("")
 # second list for testing
 global_accs = [[], []]
 # table = Table("Training accuracies", "Testing accuracies")
-table = Table()
-table.add_column("Round")
-table.add_column("Training accuracies")
-table.add_column("Testing accuracies")
 
 # Main loop
 for iexp in range(NEXPS):
+    table = Table()
+    table.add_column("Round")
+    table.add_column("Training accuracies")
+    table.add_column("Testing accuracies")
     with Live(table, auto_refresh=False) as live:
         for r in range(ROUNDS):
             # Workers download the global model
@@ -174,9 +174,21 @@ for iexp in range(NEXPS):
                 server.communicatewith(worker)
             server.update()
 
-    server.reset()
+    # Reset the server
+    config_path = exp_path / f"reinf_learning_{iexp}"
+    create(config_path, verbose=False)
+    server.reset(config_path / "loss_rl.png")
+    server.global_model = Model(nclasses).to(device)
 
-with open(exp_path / "result.pkl", "wb") as file:
-    pickle.dump(global_accs, file)
+    # Reset workers
+    for worker in workers:
+        worker.model = Model(nclasses).to(device)
+
+    # Save results
+    with open(exp_path / f"global_accs-{r}.pkl", "wb") as file:
+        pickle.dump(global_accs, file)
+
+    global_accs[0].clear()
+    global_accs[1].clear()
 
 console.print("Finished.")

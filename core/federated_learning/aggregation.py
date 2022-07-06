@@ -4,6 +4,7 @@ from itertools import compress
 from utils.plot import lineXY
 import torch
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class MovingBatch:
     """
@@ -33,9 +34,9 @@ class MovingBatch:
         """
         Return three tensors namely states, rewards and actions
         """
-        states = torch.FloatTensor(self.states)
-        rewards = torch.FloatTensor(self.rewards)
-        actions = torch.LongTensor([self.actions]).T
+        states = torch.FloatTensor(self.states).to(device)
+        rewards = torch.FloatTensor(self.rewards).to(device)
+        actions = torch.LongTensor(self.actions).to(device)
         return states, rewards, actions
 
     def update_size(self):
@@ -68,17 +69,21 @@ class EvaluatorServer:
     def __init__(
         self,
         global_model,
-        ninput,
-        noutput,
+        size_traindata,
+        size_testdata,
+        ninput=None,
+        noutput=None,
         capacity=3,
         gamma=0.99,
-        window=3,
         optimizer=None,
         *args,
         **kwargs
     ):
+        assert ninput is not None and noutput is not None, "`ninput` and `noutput` must be specified in configuration file"
         self.global_model = global_model
-        self.agent = ReinforceAgent(ninput, noutput)
+        self.n = size_traindata
+        self.t = size_testdata
+        self.agent = ReinforceAgent(ninput, noutput).to(device)
         self.optimizer = (
             torch.optim.Adam(self.agent.parameters(), lr=0.01)
             if optimizer is None
@@ -88,12 +93,12 @@ class EvaluatorServer:
         self.gamma = gamma
         self.delta = 0  # Window for moving average
         self.accuracies = []  # accuracies during training of task model
-        self.window = window  # window for weighting moving average
+        self.window = 1 # window for weighting moving average
         self.rewards = []
         self.losses = []
         self.capacity = capacity
         self.batchs = MovingBatch(capacity)
-        self.total_rewards = []
+        self.tracking_rewards = []
 
     def send(self):
         """
@@ -101,25 +106,41 @@ class EvaluatorServer:
         """
         return self.global_model.state_dict()
 
-    def receive(self, workers_update):
+    def receive(self, worker_update):
         """
         The server collects local model parameters through this method
         """
-        self.workers_updates.append(workers_update)
+        self.workers_updates.append(worker_update)
+
+    def collect_accuracy(self, worker_accuracy):
+        """
+        The server collects local model accuracy through this method
+        """
+        self.accuracies.append(worker_accuracy)
 
     def communicatewith(self, worker):
         """
         For convenience, this method is used for communication.
         """
         self.receive(worker.send(False))
+        self.collect_accuracy(worker.evaluate(train=True, perlabel=True))
+
+    def global_accuracy(self, workers_accuracies, train=False):
+        """
+        Compute the global accuracy based on the Federated Averaging algorithm
+        """
+        size = self.n if train else self.t
+        return sum(workers_accuracies) / size
 
     def discount_rewards(self):
         """
         Compute the discount reward of the current step
         """
-        r = torch.tensor([self.gamma**i * rw for i, rw in enumerate(self.rewards)])
+        tstep = torch.arange(len(self.rewards))
+        rewards = torch.tensor(self.rewards)
+        r = rewards * self.gamma**tstep
         r = r.flip(0).cumsum(0).flip(0)
-        return (r - r.mean())[-1]
+        return (r/self.gamma ** tstep)[-1]
 
     def update_batch(self, state, action):
         """
@@ -130,15 +151,22 @@ class EvaluatorServer:
         self.batchs.actions.append(action)
         self.batchs.update_size()
 
-    def update(self, state, done):
+    def update(self):
         """
         Update the global model and the agent policy
         """
         # Selection of gradients which are going
         # to participate to the next aggregation
+        state = torch.tensor(self.accuracies)
         probas = self.agent.forward(state)
-        selection = action = torch.bernouilli(probas).tolist()
-        p = sum(selection)  # number of participants
+        p = 0 # number of participants
+        while p == 0:
+            selection = action = torch.bernoulli(probas).tolist()
+            p = sum(selection)
+        # print(f"{self.accuracies = }")
+        # print(f"{action = }")
+        # print(f"{selection = }")
+        # print(f"{p = }")
         participants = compress(self.workers_updates, selection)
 
         # Update the global model
@@ -148,12 +176,16 @@ class EvaluatorServer:
         self.workers_updates.clear()
 
         # Compute the reward
-        curr_accuracy = sum(state) / p
+        curr_accuracy = sum((acc * s for acc, s in zip(self.accuracies, action))) / p
+        # print(f"{curr_accuracy = }")
+        # print(f"{self.delta = }")
         reward = curr_accuracy - self.delta
+        # print(f"{reward = }")
         self.rewards.append(reward)
+        self.tracking_rewards.append(reward)
 
         # Update batch array
-        self.update_batch(state, action)
+        self.update_batch(self.accuracies, action)
 
         # Optimization if batch is complete
         if self.batchs.isfull():
@@ -163,15 +195,26 @@ class EvaluatorServer:
             # Calculate loss
             logprob = torch.log(self.agent.forward(states))
 
-            selected_logprobs = rewards * torch.gather(logprob, 1, actions).squeeze()
+            # print(f"{self.rewards = }")
+            # print(f"{states.size() = }")
+            # print(f"{rewards.size() = }")
+            # print(f"{actions.size() = }")
+            # print(f"{logprob.size() = }")
+
+            # print(f"{torch.gather(logprob, 1, actions).size() = }")
+            # print(f"{torch.gather(logprob, 1, actions).sum(1).size() = }")
+
+            selected_logprobs = rewards * torch.gather(logprob, 1, actions).sum(1)
             loss = -selected_logprobs.mean()
             self.losses.append(loss.item())
 
             loss.backward()  # Compute gradients
             self.optimizer.step()  # Apply gradients
 
-            # Update the moving average
-            self.delta = (curr_accuracy + (self.window - 1) * self.delta) / self.window
+        # Update the moving average
+        self.delta = (curr_accuracy + (self.window - 1) * self.delta) / self.window
+        self.window += 1
+        self.accuracies.clear()
 
     def reset(self, filename=None):
         """
@@ -180,6 +223,7 @@ class EvaluatorServer:
         self.batchs.clear()
         self.workers_updates.clear()
         self.rewards.clear()
+        self.accuracies.clear()
         if filename is not None:
             attrbs = {"title": "Evolution of loss function"}
             attrbs.update({"xrange": (0, len(self.losses) - 1)})
@@ -206,11 +250,11 @@ class FederatedAveraging:
         """
         return self.global_model.state_dict()
 
-    def receive(self, workers_update):
+    def receive(self, worker_update):
         """
         The server collects local model parameters through this method
         """
-        self.workers_updates.append(workers_update)
+        self.workers_updates.append(worker_update)
 
     def communicatewith(self, worker):
         """

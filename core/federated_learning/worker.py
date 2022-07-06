@@ -95,7 +95,7 @@ class Worker:
             n = len(data)
         elif label in data.labels:
             dataloader = self.toloader(data.classified[label])
-            n = data.amount[label]
+            n = 1
         else:
             return 0
         correct, total = 0, 0
