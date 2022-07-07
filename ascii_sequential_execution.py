@@ -224,7 +224,7 @@ with Live(panel, auto_refresh=False) as live:
             worker.model = Model(nclasses).to(device)
 
         # Save results
-        with open(exp_path / f"global_accs-{r}.pkl", "wb") as file:
+        with open(exp_path / f"global_accs-{iexp}.pkl", "wb") as file:
             pickle.dump(global_accs, file)
 
         global_accs[0].clear()
