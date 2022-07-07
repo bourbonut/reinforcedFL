@@ -2,7 +2,7 @@ from core.evaluator.model import ReinforceAgent
 from collections import deque
 from itertools import compress
 from utils.plot import lineXY
-import torch
+import torch, pickle
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -229,7 +229,20 @@ class EvaluatorServer:
             attrbs.update({"xrange": (0, len(self.losses) - 1)})
             attrbs.update({"x_title": "Steps", "y_title": "Loss values"})
             lineXY({"Losses": self.losses}, filename, **attrbs)
+            pkl = str(filename).replace("png", "pkl")
+            with open(pkl, "wb") as file:
+                pickle.dump(self.losses, file)
         self.losses.clear()
+
+    def finish(self, path):
+        filename = path / "rl_rewards.png"
+        attrbs = {"title": "Evolution of reward function"}
+        attrbs.update({"xrange": (0, len(self.tracking_rewards) - 1)})
+        attrbs.update({"x_title": "Steps", "y_title": "Rewards values"})
+        lineXY({"Rewards": self.tracking_rewards}, filename, **attrbs)
+        with open(path / "rl_rewards.pkl", "wb") as file:
+            pickle.dump(self.tracking_rewards, file)
+        torch.save(self.agent.state_dict(), path / "agent.pt")
 
 class FederatedAveraging:
     """
@@ -284,4 +297,7 @@ class FederatedAveraging:
         return sum(workers_accuracies) / size
 
     def reset(self, *args, **kwargs):
+        pass
+
+    def finish(self, *args, **kwargs):
         pass

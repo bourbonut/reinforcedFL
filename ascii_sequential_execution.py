@@ -159,6 +159,8 @@ with Live(panel, auto_refresh=False) as live:
     panel.renderable = Group(*texts)
     live.refresh()
 
+# Create a directory
+create(exp_path / "agent", verbose=False)
 # Global accuracies : first list for training
 # second list for testing
 global_accs = [[], []]
@@ -214,9 +216,7 @@ with Live(panel, auto_refresh=False) as live:
             server.update()
 
         # Reset the server
-        config_path = exp_path / f"reinf_learning_{iexp}"
-        create(config_path, verbose=False)
-        server.reset(config_path / "loss_rl.png")
+        server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
         server.global_model = Model(nclasses).to(device)
 
         # Reset workers
@@ -230,4 +230,5 @@ with Live(panel, auto_refresh=False) as live:
         global_accs[0].clear()
         global_accs[1].clear()
 
+server.finish(exp_path / "agent")
 console.print("Finished.")
