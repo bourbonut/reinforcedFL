@@ -92,7 +92,7 @@ def generate(
     volume_distrb="iid",
     save2png=False,
     k=None,
-    noise=100,
+    noise=10,
 ):
     """
     Generate local dataset for workers
