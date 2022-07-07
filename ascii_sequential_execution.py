@@ -168,7 +168,7 @@ tables = []
 panel = Panel("", title="Experiment")
 
 # Main loop
-with Live(panel, auto_refresh=False) as live:
+with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
     for iexp in range(NEXPS):
         table = Table(
             "Round",
