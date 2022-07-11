@@ -6,6 +6,7 @@ import torch, pickle
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 class MovingBatch:
     """
     Class which deals with a "moving array"
@@ -25,19 +26,17 @@ class MovingBatch:
 
     def __init__(self, capacity):
         self.rewards = deque([], maxlen=capacity)
-        self.states = deque([], maxlen=capacity)
-        self.actions = deque([], maxlen=capacity)
+        self.log_probs = deque([], maxlen=capacity)
         self.size = 0
         self.capacity = capacity
 
     def totorch(self):
         """
-        Return three tensors namely states, rewards and actions
+        Return three tensors namely rewards and the log of probabilities
         """
-        states = torch.FloatTensor(self.states).to(device)
         rewards = torch.FloatTensor(self.rewards).to(device)
-        actions = torch.LongTensor(self.actions).to(device)
-        return states, rewards, actions
+        log_probs = torch.cat(self.log_probs)
+        return states, rewards, self.log_probs
 
     def update_size(self):
         """
@@ -52,12 +51,11 @@ class MovingBatch:
         """
         return self.capacity == self.size
 
-
     def clear(self):
         self.rewards.clear()
-        self.states.clear()
-        self.actions.clear()
+        self.log_probs.clear()
         self.size = 0
+
 
 class EvaluatorServer:
     """
@@ -79,7 +77,9 @@ class EvaluatorServer:
         *args,
         **kwargs
     ):
-        assert ninput is not None and noutput is not None, "`ninput` and `noutput` must be specified in configuration file"
+        assert (
+            ninput is not None and noutput is not None
+        ), "`ninput` and `noutput` must be specified in configuration file"
         self.global_model = global_model
         self.n = size_traindata
         self.t = size_testdata
@@ -93,7 +93,7 @@ class EvaluatorServer:
         self.gamma = gamma
         self.delta = 0  # Window for moving average
         self.accuracies = []  # accuracies during training of task model
-        self.window = 1 # window for weighting moving average
+        self.window = 1  # window for weighting moving average
         self.rewards = []
         self.losses = []
         self.capacity = capacity
@@ -140,15 +140,14 @@ class EvaluatorServer:
         rewards = torch.tensor(self.rewards)
         r = rewards * self.gamma**tstep
         r = r.flip(0).cumsum(0).flip(0)
-        return (r/self.gamma ** tstep)[-1]
+        return (r / self.gamma**tstep)[-1]
 
-    def update_batch(self, state, action):
+    def update_batch(self, log_prob):
         """
         Update MovingBatch class
         """
         self.batchs.rewards.append(self.discount_rewards())
-        self.batchs.states.append(state)
-        self.batchs.actions.append(action)
+        self.batchs.log_probs.append(log_prob)
         self.batchs.update_size()
 
     def update(self):
@@ -159,14 +158,12 @@ class EvaluatorServer:
         # to participate to the next aggregation
         state = torch.tensor(self.accuracies)
         probas = self.agent.forward(state)
-        p = 0 # number of participants
+        p = 0  # number of participants
+        m = torch.distributions.bernoulli.Bernoulli(probs=probas)  # multinomial
         while p == 0:
-            selection = action = torch.bernoulli(probas).tolist()
+            action_sample = m.sample()
+            selection = action = action_sample.tolist()
             p = sum(selection)
-        # print(f"{self.accuracies = }")
-        # print(f"{action = }")
-        # print(f"{selection = }")
-        # print(f"{p = }")
         participants = compress(self.workers_updates, selection)
 
         # Update the global model
@@ -176,24 +173,21 @@ class EvaluatorServer:
         self.workers_updates.clear()
 
         # Compute the reward
-        curr_accuracy = sum((acc * s for acc, s in zip(self.accuracies, action))) / p
-        # print(f"{curr_accuracy = }")
-        # print(f"{self.delta = }")
+        curr_accuracy = sum((acc * a for acc, a in zip(self.accuracies, action))) / p
         reward = curr_accuracy - self.delta
-        # print(f"{reward = }")
         self.rewards.append(reward)
         self.tracking_rewards.append(reward)
 
         # Update batch array
-        self.update_batch(self.accuracies, action)
+        self.update_batch(m.log_prob(action_sample))
 
         # Optimization if batch is complete
         if self.batchs.isfull():
             self.optimizer.zero_grad()
-            states, rewards, actions = self.batchs.totorch()
+            rewards, log_probs = self.batchs.totorch()
 
             # Calculate loss
-            logprob = torch.log(self.agent.forward(states))
+            # logprob = torch.log(self.agent.forward(states))
 
             # print(f"{self.rewards = }")
             # print(f"{states.size() = }")
@@ -204,8 +198,9 @@ class EvaluatorServer:
             # print(f"{torch.gather(logprob, 1, actions).size() = }")
             # print(f"{torch.gather(logprob, 1, actions).sum(1).size() = }")
 
-            selected_logprobs = rewards * torch.gather(logprob, 1, actions).sum(1)
-            loss = -selected_logprobs.mean()
+            # selected_logprobs = rewards * torch.gather(logprob, 1, actions).sum(1)
+            # loss = -selected_logprobs.mean()
+            loss = (-log_probs * rewards).sum()
             self.losses.append(loss.item())
 
             loss.backward()  # Compute gradients
@@ -243,6 +238,7 @@ class EvaluatorServer:
         with open(path / "rl_rewards.pkl", "wb") as file:
             pickle.dump(self.tracking_rewards, file)
         torch.save(self.agent.state_dict(), path / "agent.pt")
+
 
 class FederatedAveraging:
     """
