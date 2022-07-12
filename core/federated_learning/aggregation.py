@@ -25,8 +25,9 @@ class MovingBatch:
     """
 
     def __init__(self, capacity):
+        self.states = deque([], maxlen=capacity)
         self.rewards = deque([], maxlen=capacity)
-        self.log_probs = deque([], maxlen=capacity)
+        self.actions = deque([], maxlen=capacity)
         self.size = 0
         self.capacity = capacity
 
@@ -35,8 +36,9 @@ class MovingBatch:
         Return three tensors namely rewards and the log of probabilities
         """
         rewards = torch.FloatTensor(self.rewards).to(device)
-        log_probs = torch.cat(self.log_probs)
-        return states, rewards, self.log_probs
+        states = torch.FloatTensor(self.states).to(device)
+        actions = torch.FloatTensor(self.actions).to(device)
+        return states, rewards, actions
 
     def update_size(self):
         """
@@ -52,8 +54,9 @@ class MovingBatch:
         return self.capacity == self.size
 
     def clear(self):
+        self.states.clear()
         self.rewards.clear()
-        self.log_probs.clear()
+        self.actions.clear()
         self.size = 0
 
 
@@ -142,12 +145,13 @@ class EvaluatorServer:
         r = r.flip(0).cumsum(0).flip(0)
         return (r / self.gamma**tstep)[-1]
 
-    def update_batch(self, log_prob):
+    def update_batch(self, state, action):
         """
         Update MovingBatch class
         """
         self.batchs.rewards.append(self.discount_rewards())
-        self.batchs.log_probs.append(log_prob)
+        self.batchs.states.append(state)
+        self.batchs.actions.append(action)
         self.batchs.update_size()
 
     def update(self):
@@ -159,11 +163,10 @@ class EvaluatorServer:
         state = torch.tensor(self.accuracies)
         probas = self.agent.forward(state)
         p = 0  # number of participants
-        m = torch.distributions.bernoulli.Bernoulli(probs=probas)  # multinomial
-        while p == 0:
-            action_sample = m.sample()
-            selection = action = action_sample.tolist()
-            p = sum(selection)
+        with torch.no_grad():
+            while p == 0:
+                selection = action = torch.bernoulli(probas).tolist()
+                p = sum(selection)
         participants = compress(self.workers_updates, selection)
 
         # Update the global model
@@ -179,28 +182,18 @@ class EvaluatorServer:
         self.tracking_rewards.append(reward)
 
         # Update batch array
-        self.update_batch(m.log_prob(action_sample))
+        self.update_batch(self.accuracies, action)
 
         # Optimization if batch is complete
         if self.batchs.isfull():
             self.optimizer.zero_grad()
-            rewards, log_probs = self.batchs.totorch()
+            states, rewards, actions = self.batchs.totorch()
 
-            # Calculate loss
-            # logprob = torch.log(self.agent.forward(states))
-
-            # print(f"{self.rewards = }")
-            # print(f"{states.size() = }")
-            # print(f"{rewards.size() = }")
-            # print(f"{actions.size() = }")
-            # print(f"{logprob.size() = }")
-
-            # print(f"{torch.gather(logprob, 1, actions).size() = }")
-            # print(f"{torch.gather(logprob, 1, actions).sum(1).size() = }")
-
-            # selected_logprobs = rewards * torch.gather(logprob, 1, actions).sum(1)
-            # loss = -selected_logprobs.mean()
-            loss = (-log_probs * rewards).sum()
+            # Compute the loss value
+            probas = self.agent.forward(states)
+            multinomial = torch.distributions.bernoulli.Bernoulli(probas)
+            log_prob = multinomial.log_prob(actions)
+            loss = (-log_prob * rewards.unsqueeze(1)).sum(1).mean()
             self.losses.append(loss.item())
 
             loss.backward()  # Compute gradients
