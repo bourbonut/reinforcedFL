@@ -16,6 +16,7 @@ class Worker:
         self,
         model,
         data_path,
+        epochs,
         batch_size=64,
         optimizer=optim.Adadelta,
         criterion=nn.CrossEntropyLoss,
@@ -28,6 +29,7 @@ class Worker:
             data, batch_size=batch_size, num_workers=1
         )
         self.model = model
+        self.epochs = epochs
         self.optim_obj = optimizer
         self.optimizer = self.optim_obj(self.model.parameters())
         self.criterion = criterion()
@@ -56,22 +58,21 @@ class Worker:
         """
         self.receive(aggregator.send())
 
-    def train(self, filename=None, reset=lambda x: None, advance=lambda: None):
+    def train(self, filename=None):
         """
         Train the model using local data
         """
         losses = []
         self.model.train()
         trainloader = self.toloader(self._train)
-        reset(len(self._train) // self.batch_size)
-        for samples, labels in trainloader:
-            predictions = self.model(samples)
-            loss = self.criterion(predictions, labels.to(device))
-            losses.append(loss.item())
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-            advance()
+        for _ in range(self.epochs):
+            for samples, labels in trainloader:
+                predictions = self.model(samples)
+                loss = self.criterion(predictions, labels.to(device))
+                losses.append(loss.item())
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
         if filename is not None:
             attrbs = {"title": "Evolution of loss function"}
             attrbs.update({"xrange": (0, len(losses) - 1)})

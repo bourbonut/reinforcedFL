@@ -153,6 +153,7 @@ with Live(panel, auto_refresh=False) as live:
         worker_class(
             model.to(device),
             wk_data_path / f"worker-{i+1}.pkl",
+            EPOCHS,
             batch_size=batch_size,
         )
         for i, model in enumerate(models)
@@ -173,33 +174,13 @@ tables = []
 panel = Panel("", title="Experiment")
 progression = Progress(auto_refresh=False)
 exp_task = progression.add_task("Experiences", total=NEXPS)
-wk_task = progression.add_task("Workers done", total=NWORKERS)
-epoch_task = progression.add_task("Epoches", total=EPOCHS)
+train_task = progression.add_task("Training", total=NWORKERS)
+eval_task = progression.add_task("Evaluation", total=NWORKERS)
 prg_panel = Panel(Align.center(progression), title="Progression")
 group = Group(panel, prg_panel)
 
 # Main loop
 with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
-    if ON_GPU:
-        training_task = progression.add_task("Training")
-
-        def reset(x):
-            progression.reset(training_task, total=x)
-
-        def advance():
-            progression.advance(training_task)
-            progression.refresh()
-            live.refresh()
-
-    else:
-        reset = lambda x: None
-        advance = lambda: None
-
-    def worker_done():
-        progression.advance(wk_task)
-        progression.refresh()
-        live.refresh()
-
     for iexp in range(NEXPS):
         table = Table(
             "Round",
@@ -210,7 +191,6 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
         )
         tables.append(Align.center(table))
         panel.renderable = Group(*tables)
-        live.refresh()
         for r in range(ROUNDS):
             # Workers download the global model
             for worker in workers:
@@ -218,30 +198,22 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
 
             # Workers evaluate accuracy of the global model
             # on their local data
-            accuracies = evaluate(workers)
+            accuracies = evaluate(workers, lambda: progression.advance(eval_task))
             avg_acc = server.global_accuracy(accuracies)
             global_accs[1].append(avg_acc)
 
-            progression.reset(epoch_task)
-            progression.refresh()
-            live.refresh()
-            start = perf_counter()
             # Training loop of workers
-            for e in range(EPOCHS):
-                progression.reset(wk_task)
-                progression.refresh()
-                live.refresh()
-                # No save of loss evolution
-                # curr_path = exp_path / f"round{r}" / f"epoch{e}"
-                # create(curr_path, verbose=False)
-                # train(workers, curr_path)
-                train(workers, worker_done, reset=reset, advance=advance)
-                progression.advance(epoch_task)
-                progression.refresh()
-                live.refresh()
+            progression.reset(train_task)
+            start = perf_counter()
+            # No save of loss evolution
+            # curr_path = exp_path / f"round{r}" / f"epoch{e}"
+            # create(curr_path, verbose=False)
+            # train(workers, curr_path)
+            train(workers, lambda: progression.advance(train_task))
             duration = perf_counter() - start
 
-            accuracies = evaluate(workers, True)
+            progression.reset(eval_task)
+            accuracies = evaluate(workers, lambda: progression.advance(eval_task), True)
             avg_acc = server.global_accuracy(accuracies, True)
             global_accs[0].append(avg_acc)
 
@@ -252,7 +224,6 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
                 f"{global_accs[1][-1]:.2%}",
                 f"{duration:.3f}",
             )
-            live.refresh()
 
             # Server downloads all local updates
             for worker in workers:
@@ -275,8 +246,6 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
         global_accs[1].clear()
 
         progression.advance(exp_task)
-        progression.refresh()
-        live.refresh()
 
 server.finish(exp_path / "agent")
 console.print("Finished.")
