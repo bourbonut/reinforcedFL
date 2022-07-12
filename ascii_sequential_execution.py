@@ -11,7 +11,9 @@ from rich.console import Console, Group
 from rich.align import Align
 from rich.live import Live
 from rich.panel import Panel
+from rich.progress import Progress
 from pathlib import Path
+from time import perf_counter
 
 parser = argparse.ArgumentParser()
 parser.add_argument(dest="environment", help="environment path")
@@ -161,19 +163,49 @@ with Live(panel, auto_refresh=False) as live:
 
 # Create a directory
 create(exp_path / "agent", verbose=False)
+
 # Global accuracies : first list for training
 # second list for testing
 global_accs = [[], []]
 tables = []
+
+# Panel and progress bars
 panel = Panel("", title="Experiment")
+progression = Progress(auto_refresh=False)
+exp_task = progression.add_task("Experiences", total=NEXPS)
+wk_task = progression.add_task("Workers done", total=NWORKERS)
+epoch_task = progression.add_task("Epoches", total=EPOCHS)
+prg_panel = Panel(Align.center(progression), title="Progression")
+group = Group(panel, prg_panel)
 
 # Main loop
-with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
+with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
+    if ON_GPU:
+        training_task = progression.add_task("Training")
+
+        def reset(x):
+            progression.reset(training_task, total=x)
+
+        def advance():
+            progression.advance(training_task)
+            progression.refresh()
+            live.refresh()
+
+    else:
+        reset = lambda x: None
+        advance = lambda: None
+
+    def worker_done():
+        progression.advance(wk_task)
+        progression.refresh()
+        live.refresh()
+
     for iexp in range(NEXPS):
         table = Table(
             "Round",
             "Training accuracies",
             "Testing accuracies",
+            "Duration [s]",
             title=f"Experiment {iexp}",
         )
         tables.append(Align.center(table))
@@ -190,13 +222,24 @@ with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
             avg_acc = server.global_accuracy(accuracies)
             global_accs[1].append(avg_acc)
 
+            progression.reset(epoch_task)
+            progression.refresh()
+            live.refresh()
+            start = perf_counter()
             # Training loop of workers
             for e in range(EPOCHS):
+                progression.reset(wk_task)
+                progression.refresh()
+                live.refresh()
                 # No save of loss evolution
                 # curr_path = exp_path / f"round{r}" / f"epoch{e}"
                 # create(curr_path, verbose=False)
                 # train(workers, curr_path)
-                train(workers)
+                train(workers, worker_done, reset=reset, advance=advance)
+                progression.advance(epoch_task)
+                progression.refresh()
+                live.refresh()
+            duration = perf_counter() - start
 
             accuracies = evaluate(workers, True)
             avg_acc = server.global_accuracy(accuracies, True)
@@ -205,8 +248,9 @@ with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
             # Update the table for training average accuracy
             table.add_row(
                 str(r + 1),
-                "{:.2%}".format(avg_acc),
-                "{:.2%}".format(global_accs[1][-1]),
+                f"{avg_acc:2%}",
+                f"{global_accs[1][-1]:.2%}",
+                f"{duration:.3f}",
             )
             live.refresh()
 
@@ -229,6 +273,10 @@ with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
 
         global_accs[0].clear()
         global_accs[1].clear()
+
+        progression.advance(exp_task)
+        progression.refresh()
+        live.refresh()
 
 server.finish(exp_path / "agent")
 console.print("Finished.")

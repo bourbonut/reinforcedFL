@@ -31,6 +31,7 @@ class Worker:
         self.optim_obj = optimizer
         self.optimizer = self.optim_obj(self.model.parameters())
         self.criterion = criterion()
+        self.batch_size = batch_size
 
     def receive(self, parameters):
         """
@@ -55,13 +56,14 @@ class Worker:
         """
         self.receive(aggregator.send())
 
-    def train(self, filename=None):
+    def train(self, filename=None, reset=lambda x: None, advance=lambda: None):
         """
         Train the model using local data
         """
         losses = []
         self.model.train()
         trainloader = self.toloader(self._train)
+        reset(len(self._train) // self.batch_size)
         for samples, labels in trainloader:
             predictions = self.model(samples)
             loss = self.criterion(predictions, labels.to(device))
@@ -69,6 +71,7 @@ class Worker:
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+            advance()
         if filename is not None:
             attrbs = {"title": "Evolution of loss function"}
             attrbs.update({"xrange": (0, len(losses) - 1)})

@@ -6,19 +6,22 @@ Functions to run for making parallel the training part of workers
 from threading import Thread
 
 
-def train(workers, path=None):
+def train(workers, done, path=None, **kwargs):
     """
     Train workers on their local data in parallel
     """
     if path is None:
-        threads = [
-            Thread(target=lambda worker: worker.train(), args=(worker,))
-            for worker in workers
-        ]
+
+        def train_worker(worker):
+            worker.train()
+            done()
+
+        threads = [Thread(target=train_worker, args=(worker,)) for worker in workers]
     else:
 
         def train_worker(worker, index, path):
             worker.train(path / f"worker-{index}.png")
+            done()
 
         threads = [
             Thread(target=train_worker, args=(worker, i, path))
