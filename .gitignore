@@ -4,6 +4,9 @@ experiments/
 # Data folder
 data/
 
+# Configuration folder
+configurations/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

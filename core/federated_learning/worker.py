@@ -1,11 +1,12 @@
 from torch.utils.data import DataLoader
 from torch import optim, nn
-import pickle, torch
-from utils import lineXY
+import pickle, torch, statistics
+from utils.plot import lineXY
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class Node:
+
+class Worker:
     """
     Class which represents a 'worker' and communicate with the server.
     It holds the local data and a model.
@@ -22,10 +23,10 @@ class Node:
     ):
         with open(data_path, "rb") as file:
             data = pickle.load(file)
-        self.trainloader = DataLoader(data[0], batch_size=batch_size, num_workers=1)
-        self.testloader = DataLoader(data[1], batch_size=batch_size, num_workers=1)
-        self.nk = len(data[0])  # number of local examples
-        self.nt = len(data[1])  # number of local tests
+        self._train, self._test = data
+        self.toloader = lambda data: DataLoader(
+            data, batch_size=batch_size, num_workers=1
+        )
         self.model = model
         self.optim_obj = optimizer
         self.optimizer = self.optim_obj(self.model.parameters())
@@ -39,11 +40,14 @@ class Node:
         self.model.load_state_dict(parameters)
         self.optimizer = self.optim_obj(self.model.parameters())
 
-    def send(self):
+    def send(self, weighted=True):
         """
         The node sends his local model parameters through this method
         """
-        return [self.nk * weight for weight in self.model.parameters()]
+        if weighted:
+            return [len(self._train) * weight for weight in self.model.parameters()]
+        else:
+            return self.model.parameters()
 
     def communicatewith(self, aggregator):
         """
@@ -57,28 +61,68 @@ class Node:
         """
         losses = []
         self.model.train()
-        for samples, labels in self.trainloader:
+        trainloader = self.toloader(self._train)
+        for samples, labels in trainloader:
             predictions = self.model(samples)
             loss = self.criterion(predictions, labels.to(device))
             losses.append(loss.item())
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
-        if not (filename is None):
+        if filename is not None:
             attrbs = {"title": "Evolution of loss function"}
             attrbs.update({"xrange": (0, len(losses) - 1)})
             attrbs.update({"x_title": "Steps", "y_title": "Loss values"})
             lineXY({"Losses": losses}, filename, **attrbs)
 
-    def evaluate(self):
+    def _evaluate(self, train=False, label=None):
         """
-        Compute the accuracy on the local data for testing
+        Compute the accuracy on the local data given the parameters
+        See `evaluate` for global usage
+
+        Parameters
+
+            train (bool):
+                True for evaluation on data for training else
+                for evaluation on data for testing
+            label (int):
+                Evaluate on data given the label else evaluate
+                on all available data
         """
+        data = self._train if train else self._test
+        if label is None:
+            dataloader = self.toloader(data)
+            n = len(data)
+        elif label in data.labels:
+            dataloader = self.toloader(data.classified[label])
+            n = 1
+        else:
+            return 0
         correct, total = 0, 0
         self.model.eval()
-        for samples, labels in self.testloader:
+        for samples, labels in dataloader:
             predictions = self.model(samples)
             _, predicted = torch.max(predictions.data, 1)
             total += labels.size(0)
             correct += (predicted == labels.to(device)).sum().item()
-        return self.nt * correct / total
+        return n * correct / total
+
+    def evaluate(self, train=False, perlabel=False):
+        """
+        Compute the accuracy on the local data given the parameters
+
+        Parameters
+
+            train (bool):
+                True for evaluation on data for training else
+                for evaluation on data for testing
+            perlabel (bool):
+                The evaluation is done label per label if it is True
+                which means the accuracy is computed as the average of
+                the accuracies per label
+        """
+        if perlabel:
+            labels = self._train.labels if train else self._test.labels
+            return statistics.mean([self._evaluate(train, label) for label in labels])
+        else:
+            return self._evaluate(train)

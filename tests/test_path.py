@@ -13,8 +13,3 @@ def test_experiments():
 def test_iterate():
     path = iterate(EXP_PATH)
     assert not (path.exists())
-
-
-def test_data_path_key():
-    path = data_path_key("MNIST", "IID", 4)
-    assert path == EXP_PATH / "data-MNIST-IID-4"

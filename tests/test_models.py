@@ -1,47 +1,37 @@
 from utils.path import DATA_PATH
-from model4FL.mnist import *
+from utils import dataset
+from model4FL.mnist import Model, extras
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 import torch
 from rich.progress import Progress
 import pytest
 
-isdownloaded = not (DATA_PATH.exists())
-mnist_dataset = {}
-mnist_dataset["training"] = datasets.MNIST(
-    root="data", train=True, download=isdownloaded, transform=ToTensor()
-)
-mnist_dataset["test"] = datasets.MNIST(root="data", train=False, transform=ToTensor())
-
+datatrain, datatest = dataset("MNIST")
 batch_size = 64
 trainloader = torch.utils.data.DataLoader(
-    mnist_dataset["training"], batch_size=batch_size, shuffle=True, num_workers=2
+    datatrain, batch_size=batch_size, shuffle=True, num_workers=2
 )
 
 testloader = torch.utils.data.DataLoader(
-    mnist_dataset["test"], batch_size=batch_size, shuffle=False, num_workers=2
+    datatest, batch_size=batch_size, shuffle=False, num_workers=2
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-nclasses = len(mnist_dataset["training"].classes)
-model = ModelMNIST(nclasses).to(device)
-
+nclasses = len(datatrain.classes)
+model = Model(nclasses).to(device)
 
 def test_forward():
-    sample, _ = mnist_dataset["training"][0]
+    sample, _ = datatrain[0]
     model(sample.unsqueeze(0))
 
 
 def test_loss():
-    sample, label = mnist_dataset["training"][0]
-    prediction = model(sample.unsqueeze(0))
-    loss_class = extras["loss"]
+    i, (sample, label) = next(enumerate(trainloader))
+    prediction = model(sample)
+    criterion = extras["criterion"]()
 
-    label_probas = torch.tensor(
-        [1 if i == label else 0 for i in range(10)], dtype=torch.float
-    ).unsqueeze(0)
-    criterion = loss_class()
-    loss = criterion(prediction, label_probas)
+    loss = criterion(prediction, label.to(device))
 
 
 def test_backpropagation():
@@ -50,7 +40,7 @@ def test_backpropagation():
     optimizer = extras["optimizer"](model.parameters())
 
     criterion = extras["criterion"]()
-    loss = criterion(prediction, labels)
+    loss = criterion(prediction, labels.to(device))
 
     optimizer.zero_grad()
     loss.backward()
@@ -63,7 +53,7 @@ def test_train():
     optimizer = extras["optimizer"](model.parameters())
     criterion = extras["criterion"]()
 
-    size = len(mnist_dataset["training"])
+    size = len(datatrain)
     with Progress(auto_refresh=False) as progress:
         nsteps = size * num_epochs // batch_size
         task = progress.add_task("Training ...", total=nsteps)
@@ -72,7 +62,7 @@ def test_train():
             total = 0
             for i, (samples, labels) in enumerate(trainloader):
                 predictions = model(samples)
-                loss = criterion(predictions, labels)
+                loss = criterion(predictions, labels.to(device))
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -80,7 +70,7 @@ def test_train():
 
                 _, predicted = torch.max(predictions.data, 1)
                 total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+                correct += (predicted == labels.to(device)).sum().item()
 
                 progress.advance(task)
                 progress.refresh()

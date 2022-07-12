@@ -13,28 +13,20 @@ def create(path, verbose=True):
     """
     Create a full path recursively
     """
-    if not (path.exists()):
-        if not (path.parent.exists()):
+    if not path.exists():
+        if not path.parent.exists():
             create(path.parent, verbose=verbose)
         path.mkdir()
         if verbose:
-            print("{} was created.".format(str(path)))
+            print(f"{path} was created.")
 
 
 def iterate(path):
     """
     Find the path for a new experiment
     """
-    folders = list(path.iterdir())
     index = 1
     while any(path.glob(f"experiment-{index}*")):
         index += 1
 
     return path / f"experiment-{index}"
-
-
-def data_path_key(dataset_name, partition_type, k_nodes):
-    """
-    Get the path for distributed data
-    """
-    return EXP_PATH / "data-{}-{}-{}".format(dataset_name, partition_type, k_nodes)
