@@ -3,10 +3,9 @@ import gym
 import pytest
 
 env = gym.make("CartPole-v0")
-ReinforceAgent.NHIDDEN = 16
 ninput = env.observation_space.shape[0]
 noutput = env.action_space.n
-agent = ReinforceAgent(ninput, noutput).to(device)
+agent = CartPoleAgent(ninput, noutput).to(device)
 
 
 def func(x):

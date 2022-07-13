@@ -8,8 +8,6 @@ import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-# WARNING: Not finished, only works on CartPole (see `gym` library)
 class ReinforceAgent(nn.Module):
 
     """
@@ -21,13 +19,36 @@ class ReinforceAgent(nn.Module):
     def __init__(self, ninput, noutput, *args, **kwargs):
         super(ReinforceAgent, self).__init__()
         self.input = nn.Linear(ninput, self.NHIDDEN)
+        self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.hidden3 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.output = nn.Linear(self.NHIDDEN, noutput)
+
+    def forward(self, x):
+        x = x.to(device)
+        x = F.relu(self.input(x))
+        x = F.relu(self.hidden1(x))
+        x = F.relu(self.hidden2(x))
+        x = F.relu(self.hidden3(x))
+        return F.softmax(self.output(x), dim=-1)
+
+class CartPoleAgent(nn.Module):
+
+    """
+    Neural network for REINFORCE algorithm
+    """
+
+    NHIDDEN = 16
+
+    def __init__(self, ninput, noutput, *args, **kwargs):
+        super(ReinforceAgent, self).__init__()
+        self.input = nn.Linear(ninput, self.NHIDDEN)
         self.output = nn.Linear(self.NHIDDEN, noutput)
 
     def forward(self, x):
         x = x.to(device)
         x = F.relu(self.input(x))
         return F.softmax(self.output(x), dim=-1)
-
 
 def discount_rewards(rewards, gamma=0.99):
     """
