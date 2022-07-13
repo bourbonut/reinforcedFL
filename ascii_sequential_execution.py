@@ -11,7 +11,6 @@ from rich.console import Console, Group
 from rich.align import Align
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import Progress
 from pathlib import Path
 from time import perf_counter
 
@@ -172,31 +171,15 @@ create(exp_path / "agent", verbose=False)
 global_accs = [[], []]
 tables = []
 
-# Panel and progress bars
+# Panel
 panel = Panel("", title="Experiment")
-progression = Progress(auto_refresh=False)
-exp_task = progression.add_task("Experiences", total=NEXPS)
-train_task = progression.add_task("Training", total=NWORKERS)
-eval_task = progression.add_task("Evaluation", total=NWORKERS)
-prg_panel = Panel(Align.center(progression), title="Progression")
-group = Group(panel, prg_panel)
-
 # Main loop
-with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
-
-    def advance_eval():
-        progression.advance(eval_task)
-        live.refresh()
-
-    def advance_train():
-        progression.advance(train_task)
-        live.refresh()
-
+with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
     for iexp in range(NEXPS):
         table = Table(
             "Round",
-            "Training accuracies",
-            "Testing accuracies",
+            "Training accuracies [%]",
+            "Testing accuracies [%]",
             "Duration [s]",
             title=f"Experiment {iexp}",
         )
@@ -210,25 +193,20 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
 
             # Workers evaluate accuracy of the global model
             # on their local data
-            progression.reset(eval_task)
-            live.refresh()
-            accuracies = evaluate(workers, advance_eval())
+            accuracies = evaluate(workers)
             avg_acc = server.global_accuracy(accuracies)
             global_accs[1].append(avg_acc)
 
             # Training loop of workers
-            progression.reset(train_task)
-            live.refresh()
             start = perf_counter()
             # No save of loss evolution
             # curr_path = exp_path / f"round{r}" / f"epoch{e}"
             # create(curr_path, verbose=False)
             # train(workers, curr_path)
-            train(workers, lambda: advance_train())
+            train(workers)
             duration = perf_counter() - start
 
-            progression.reset(eval_task)
-            accuracies = evaluate(workers, advance_eval(), True)
+            accuracies = evaluate(workers, True)
             avg_acc = server.global_accuracy(accuracies, True)
             global_accs[0].append(avg_acc)
 
@@ -237,7 +215,7 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
                 str(r + 1),
                 f"{avg_acc:.2%}",
                 f"{global_accs[1][-1]:.2%}",
-                f"{duration:.3f}",
+                f"{duration:.3f} s",
             )
             live.refresh()
 
@@ -248,7 +226,7 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
 
         # Reset the server
         server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
-        server.global_model = Model(nclasses).to(device)
+        server.global_model = Model(nclasses, device).to(device)
 
         # Reset workers
         for worker in workers:
@@ -260,9 +238,6 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
 
         global_accs[0].clear()
         global_accs[1].clear()
-
-        progression.advance(exp_task)
-        live.refresh()
 
 server.finish(exp_path / "agent")
 console.print("Finished.")
