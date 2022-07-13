@@ -4,7 +4,7 @@ from itertools import compress
 from utils.plot import lineXY
 import torch, pickle
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class MovingBatch:
@@ -24,12 +24,13 @@ class MovingBatch:
         [  |      |      |      |  ]
     """
 
-    def __init__(self, capacity):
+    def __init__(self, capacity, device):
         self.states = deque([], maxlen=capacity)
         self.rewards = deque([], maxlen=capacity)
         self.actions = deque([], maxlen=capacity)
         self.size = 0
         self.capacity = capacity
+        self.device = device
 
     def totorch(self):
         """
@@ -86,7 +87,8 @@ class EvaluatorServer:
         self.global_model = global_model
         self.n = size_traindata
         self.t = size_testdata
-        self.agent = ReinforceAgent(ninput, noutput).to(device)
+        device = self.global_model.device
+        self.agent = ReinforceAgent(ninput, noutput, device).to(device)
         self.optimizer = (
             torch.optim.Adam(self.agent.parameters(), lr=0.01)
             if optimizer is None
@@ -100,7 +102,7 @@ class EvaluatorServer:
         self.rewards = []
         self.losses = []
         self.capacity = capacity
-        self.batchs = MovingBatch(capacity)
+        self.batchs = MovingBatch(capacity, device)
         self.tracking_rewards = []
 
     def send(self):

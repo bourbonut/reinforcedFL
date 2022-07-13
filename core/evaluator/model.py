@@ -16,16 +16,17 @@ class ReinforceAgent(nn.Module):
 
     NHIDDEN = 128
 
-    def __init__(self, ninput, noutput, *args, **kwargs):
+    def __init__(self, ninput, noutput, device, *args, **kwargs):
         super(ReinforceAgent, self).__init__()
         self.input = nn.Linear(ninput, self.NHIDDEN)
         self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
         self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
         self.hidden3 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
         self.output = nn.Linear(self.NHIDDEN, noutput)
+        self.device = device
 
     def forward(self, x):
-        x = x.to(device)
+        x = x.to(self.device)
         x = F.relu(self.input(x))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))

@@ -3,7 +3,7 @@ from torch import optim, nn
 import pickle, torch, statistics
 from utils.plot import lineXY
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Worker:
@@ -29,6 +29,7 @@ class Worker:
             data, batch_size=batch_size, num_workers=1
         )
         self.model = model
+        self.device = self.model.device
         self.epochs = epochs
         self.optim_obj = optimizer
         self.optimizer = self.optim_obj(self.model.parameters())
@@ -68,7 +69,7 @@ class Worker:
         for _ in range(self.epochs):
             for samples, labels in trainloader:
                 predictions = self.model(samples)
-                loss = self.criterion(predictions, labels.to(device))
+                loss = self.criterion(predictions, labels.to(self.device))
                 losses.append(loss.item())
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -108,7 +109,7 @@ class Worker:
             predictions = self.model(samples)
             _, predicted = torch.max(predictions.data, 1)
             total += labels.size(0)
-            correct += (predicted == labels.to(device)).sum().item()
+            correct += (predicted == labels.to(self.device)).sum().item()
         return n * correct / total
 
     def evaluate(self, train=False, perlabel=False):

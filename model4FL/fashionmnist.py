@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch import optim
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class Model(nn.Module):
@@ -11,7 +11,7 @@ class Model(nn.Module):
     Neural network for MNIST dataset
     """
 
-    def __init__(self, nclasses):
+    def __init__(self, nclasses, device):
         super(Model, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=(3, 3))
         self.conv2 = nn.Conv2d(32, 64, kernel_size=(3, 3))
@@ -20,9 +20,10 @@ class Model(nn.Module):
         self.hidden_layer = nn.Linear(24 * 24 * 16, 128)
         self.dropout2 = nn.Dropout(0.5)
         self.output = nn.Linear(128, nclasses)
+        self.device = device
 
     def forward(self, x):
-        x = x.to(device)
+        x = x.to(self.device)
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = self.maxp2d(x)

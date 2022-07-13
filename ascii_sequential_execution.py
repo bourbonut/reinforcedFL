@@ -25,8 +25,6 @@ parser.add_argument(
 parser.add_argument("--gpu", action="store_true", dest="gpu", help="Run on GPU")
 args = parser.parse_args()
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 # Introduction
 arguments = ["environment", "distribution", "model"]
 parameters = {key: None for key in arguments}
@@ -59,6 +57,7 @@ worker_class = getattr(worker, parameters["model"]["worker_class"])
 
 ON_GPU = args.gpu
 REFRESH = args.refresh
+device = torch.device("cuda" if ON_GPU and torch.cuda.is_available() else "cpu")
 
 # Loading model, optimizer (in extras)
 if hasattr(model4FL, parameters["model"]["task_model"]):
@@ -137,7 +136,10 @@ with Live(panel, auto_refresh=False) as live:
     panel.renderable = Group(*texts)
     live.refresh()
     server = server_class(
-        Model(nclasses).to(device), size_traindata, size_testdata, **parameters["model"]
+        Model(nclasses, device).to(device),
+        size_traindata,
+        size_testdata,
+        **parameters["model"],
     )
     texts[-1] = Align.center("[green]The server is successfully initialized.[/]")
     panel.renderable = Group(*texts)
@@ -147,7 +149,7 @@ with Live(panel, auto_refresh=False) as live:
     texts.append(Align.center("[cyan]Initialization of the workers[/]"))
     panel.renderable = Group(*texts)
     live.refresh()
-    models = (Model(nclasses) for _ in range(NWORKERS))
+    models = (Model(nclasses, device) for _ in range(NWORKERS))
     batch_size = parameters["model"].get("batch_size", 64)
     workers = tuple(
         worker_class(
@@ -180,7 +182,16 @@ prg_panel = Panel(Align.center(progression), title="Progression")
 group = Group(panel, prg_panel)
 
 # Main loop
-with Live(group, refresh_per_second=0.5, vertical_overflow="fold") as live:
+with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
+
+    def advance_eval():
+        progression.advance(eval_task)
+        live.refresh()
+
+    def advance_train():
+        progression.advance(train_task)
+        live.refresh()
+
     for iexp in range(NEXPS):
         table = Table(
             "Round",
@@ -191,6 +202,7 @@ with Live(group, refresh_per_second=0.5, vertical_overflow="fold") as live:
         )
         tables.append(Align.center(table))
         panel.renderable = Group(*tables)
+        live.refresh()
         for r in range(ROUNDS):
             # Workers download the global model
             for worker in workers:
@@ -199,32 +211,35 @@ with Live(group, refresh_per_second=0.5, vertical_overflow="fold") as live:
             # Workers evaluate accuracy of the global model
             # on their local data
             progression.reset(eval_task)
-            accuracies = evaluate(workers, lambda: progression.advance(eval_task))
+            live.refresh()
+            accuracies = evaluate(workers, advance_eval())
             avg_acc = server.global_accuracy(accuracies)
             global_accs[1].append(avg_acc)
 
             # Training loop of workers
             progression.reset(train_task)
+            live.refresh()
             start = perf_counter()
             # No save of loss evolution
             # curr_path = exp_path / f"round{r}" / f"epoch{e}"
             # create(curr_path, verbose=False)
             # train(workers, curr_path)
-            train(workers, lambda: progression.advance(train_task))
+            train(workers, lambda: advance_train())
             duration = perf_counter() - start
 
             progression.reset(eval_task)
-            accuracies = evaluate(workers, lambda: progression.advance(eval_task), True)
+            accuracies = evaluate(workers, advance_eval(), True)
             avg_acc = server.global_accuracy(accuracies, True)
             global_accs[0].append(avg_acc)
 
             # Update the table for training average accuracy
             table.add_row(
                 str(r + 1),
-                f"{avg_acc:2%}",
+                f"{avg_acc:.2%}",
                 f"{global_accs[1][-1]:.2%}",
                 f"{duration:.3f}",
             )
+            live.refresh()
 
             # Server downloads all local updates
             for worker in workers:
@@ -247,6 +262,7 @@ with Live(group, refresh_per_second=0.5, vertical_overflow="fold") as live:
         global_accs[1].clear()
 
         progression.advance(exp_task)
+        live.refresh()
 
 server.finish(exp_path / "agent")
 console.print("Finished.")
