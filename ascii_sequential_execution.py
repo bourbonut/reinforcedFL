@@ -180,7 +180,7 @@ prg_panel = Panel(Align.center(progression), title="Progression")
 group = Group(panel, prg_panel)
 
 # Main loop
-with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
+with Live(group, refresh_per_second=0.5, vertical_overflow="fold") as live:
     for iexp in range(NEXPS):
         table = Table(
             "Round",
@@ -198,6 +198,7 @@ with Live(group, auto_refresh=False, vertical_overflow="fold") as live:
 
             # Workers evaluate accuracy of the global model
             # on their local data
+            progression.reset(eval_task)
             accuracies = evaluate(workers, lambda: progression.advance(eval_task))
             avg_acc = server.global_accuracy(accuracies)
             global_accs[1].append(avg_acc)

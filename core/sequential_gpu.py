@@ -3,12 +3,12 @@ Functions to run when a GPU is available
 """
 
 
-def train(workers, update):
+def train(workers, update, path=None):
     """
     Train workers on their local data in sequential
     """
     for worker in workers:
-        worker.train(filename=path, reset=reset, advance=advance)
+        worker.train(filename=path)
         update()
 
 
