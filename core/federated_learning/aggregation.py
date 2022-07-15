@@ -214,6 +214,8 @@ class EvaluatorServer:
         self.workers_updates.clear()
         self.rewards.clear()
         self.accuracies.clear()
+        self.delta = 0
+        self.window = 1
         if filename is not None:
             attrbs = {"title": "Evolution of loss function"}
             attrbs.update({"xrange": (0, len(self.losses) - 1)})
