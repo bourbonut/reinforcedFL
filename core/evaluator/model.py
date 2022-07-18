@@ -18,20 +18,39 @@ class ReinforceAgent(nn.Module):
 
     def __init__(self, ninput, noutput, device, *args, **kwargs):
         super(ReinforceAgent, self).__init__()
-        self.input = nn.Linear(ninput, self.NHIDDEN)
-        self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.hidden3 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.output = nn.Linear(self.NHIDDEN, noutput)
+        # Layers for selection 
+        self.input1 = nn.Linear(ninput, self.NHIDDEN)
+        self.hidden11 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.hidden12 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.hidden13 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.output1 = nn.Linear(self.NHIDDEN, noutput)
+
+        # Layers for discard
+        self.input2 = nn.Linear(ninput, self.NHIDDEN)
+        self.hidden21 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.hidden22 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.hidden23 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.output2 = nn.Linear(self.NHIDDEN, noutput)
         self.device = device
 
     def forward(self, x):
         x = x.to(self.device)
-        x = F.relu(self.input(x))
-        x = F.relu(self.hidden1(x))
-        x = F.relu(self.hidden2(x))
-        x = F.relu(self.hidden3(x))
-        return F.softmax(self.output(x), dim=-1)
+        # Selection forward
+        x1 = F.relu(self.input1(x1))
+        x1 = F.relu(self.hidden11(x1))
+        x1 = F.relu(self.hidden12(x1))
+        x1 = F.relu(self.hidden13(x1))
+        output1 = self.output1(x1)
+
+        # Discard forward
+        x2 = F.relu(self.input2(x1))
+        x2 = F.relu(self.hidden21(x1))
+        x2 = F.relu(self.hidden22(x1))
+        x2 = F.relu(self.hidden23(x1))
+        output2 = self.output2(x1)
+        
+        output = torch.stack((x1, x2), dim=1)
+        return F.softmax(output, dim=1)
 
 class CartPoleAgent(nn.Module):
 

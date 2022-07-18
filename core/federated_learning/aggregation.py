@@ -167,7 +167,8 @@ class EvaluatorServer:
         p = 0  # number of participants
         with torch.no_grad():
             while p == 0:
-                selection = action = torch.bernoulli(probas).tolist()
+                action = torch.bernoulli(probas)
+                selection = action[:, 0].tolist()
                 p = sum(selection)
         participants = compress(self.workers_updates, selection)
 
@@ -178,7 +179,7 @@ class EvaluatorServer:
         self.workers_updates.clear()
 
         # Compute the reward
-        curr_accuracy = sum((acc * a for acc, a in zip(self.accuracies, action))) / p
+        curr_accuracy = sum((acc * a for acc, a in zip(self.accuracies, selection))) / p
         reward = curr_accuracy - self.delta
         self.rewards.append(reward)
         self.tracking_rewards.append(reward)
@@ -193,8 +194,7 @@ class EvaluatorServer:
 
             # Compute the loss value
             probas = self.agent.forward(states)
-            multinomial = torch.distributions.bernoulli.Bernoulli(probas)
-            log_prob = multinomial.log_prob(actions)
+            log_prob = (torch.log(probas) * actions).sum(1)
             loss = (-log_prob * rewards.unsqueeze(1)).sum(1).mean()
             self.losses.append(loss.item())
 
