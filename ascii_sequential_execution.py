@@ -180,7 +180,7 @@ with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
             "Round",
             "Training accuracies [%]",
             "Testing accuracies [%]",
-            "Duration [s]",
+            "Duration \[s]",
             title=f"Experiment {iexp}",
         )
         tables.append(Align.center(table))
@@ -230,7 +230,7 @@ with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
 
         # Reset workers
         for worker in workers:
-            worker.model = Model(nclasses).to(device)
+            worker.model = Model(nclasses, device).to(device)
 
         # Save results
         with open(exp_path / f"global_accs-{iexp}.pkl", "wb") as file:

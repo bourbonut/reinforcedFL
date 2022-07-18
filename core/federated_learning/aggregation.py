@@ -36,9 +36,9 @@ class MovingBatch:
         """
         Return three tensors namely rewards and the log of probabilities
         """
-        rewards = torch.FloatTensor(self.rewards).to(device)
-        states = torch.FloatTensor(self.states).to(device)
-        actions = torch.FloatTensor(self.actions).to(device)
+        rewards = torch.FloatTensor(self.rewards).to(self.device)
+        states = torch.FloatTensor(self.states).to(self.device)
+        actions = torch.FloatTensor(self.actions).to(self.device)
         return states, rewards, actions
 
     def update_size(self):
