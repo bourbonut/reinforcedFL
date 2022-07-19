@@ -169,23 +169,20 @@ create(exp_path / "agent", verbose=False)
 # Global accuracies : first list for training
 # second list for testing
 global_accs = [[], []]
-tables = []
 
 # Panel
-panel = Panel("", title="Experiment")
+console.print(Align.center(Markdown("## Experiments\n")))
 # Main loop
-with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
-    for iexp in range(NEXPS):
-        table = Table(
-            "Round",
-            "Training accuracies [%]",
-            "Testing accuracies [%]",
-            "Duration \[s]",
-            title=f"Experiment {iexp}",
-        )
-        tables.append(Align.center(table))
-        panel.renderable = Group(*tables)
-        live.refresh()
+for iexp in range(NEXPS):
+    table = Table(
+        "Round",
+        "Training accuracies [%]",
+        "Testing accuracies [%]",
+        "Duration \[s]",
+        title=f"Experiment {iexp}",
+    )
+    align = Align.center(table)
+    with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
         for r in range(ROUNDS):
             # Workers download the global model
             for worker in workers:
@@ -224,20 +221,20 @@ with Live(panel, auto_refresh=False, vertical_overflow="fold") as live:
                 server.communicatewith(worker)
             server.update()
 
-        # Reset the server
-        server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
-        server.global_model = Model(nclasses, device).to(device)
+    # Reset the server
+    server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
+    server.global_model = Model(nclasses, device).to(device)
 
-        # Reset workers
-        for worker in workers:
-            worker.model = Model(nclasses, device).to(device)
+    # Reset workers
+    for worker in workers:
+        worker.model = Model(nclasses, device).to(device)
 
-        # Save results
-        with open(exp_path / f"global_accs-{iexp}.pkl", "wb") as file:
-            pickle.dump(global_accs, file)
+    # Save results
+    with open(exp_path / f"global_accs-{iexp}.pkl", "wb") as file:
+        pickle.dump(global_accs, file)
 
-        global_accs[0].clear()
-        global_accs[1].clear()
+    global_accs[0].clear()
+    global_accs[1].clear()
 
 server.finish(exp_path / "agent")
 console.print("Finished.")
