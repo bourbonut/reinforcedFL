@@ -101,6 +101,7 @@ class EvaluatorServer:
         self.window = 1  # window for weighting moving average
         self.rewards = []
         self.losses = []
+        self.selections = [] # selections over time for analysis
         self.capacity = capacity
         self.batchs = MovingBatch(capacity, device)
         self.tracking_rewards = []
@@ -234,6 +235,8 @@ class EvaluatorServer:
         lineXY({"Rewards": self.tracking_rewards}, filename, **attrbs)
         with open(path / "rl_rewards.pkl", "wb") as file:
             pickle.dump(self.tracking_rewards, file)
+        with open(path / "selections.pkl", "wb") as file:
+            pickle.dump(self.selections, file)
         torch.save(self.agent.state_dict(), path / "agent.pt")
 
 
