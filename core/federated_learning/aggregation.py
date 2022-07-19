@@ -38,7 +38,7 @@ class MovingBatch:
         """
         rewards = torch.FloatTensor(self.rewards).to(self.device)
         states = torch.FloatTensor(self.states).to(self.device)
-        actions = torch.FloatTensor(self.actions).to(self.device)
+        actions = torch.stack(tuple(self.actions)).to(self.device)
         return states, rewards, actions
 
     def update_size(self):
@@ -185,7 +185,7 @@ class EvaluatorServer:
         self.tracking_rewards.append(reward)
 
         # Update batch array
-        self.update_batch(self.accuracies, action)
+        self.update_batch(self.accuracies, action.T)
 
         # Optimization if batch is complete
         if self.batchs.isfull():

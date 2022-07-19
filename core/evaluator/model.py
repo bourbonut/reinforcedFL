@@ -35,21 +35,22 @@ class ReinforceAgent(nn.Module):
 
     def forward(self, x):
         x = x.to(self.device)
+
         # Selection forward
-        x1 = F.relu(self.input1(x1))
+        x1 = F.relu(self.input1(x))
         x1 = F.relu(self.hidden11(x1))
         x1 = F.relu(self.hidden12(x1))
         x1 = F.relu(self.hidden13(x1))
         output1 = self.output1(x1)
 
         # Discard forward
-        x2 = F.relu(self.input2(x1))
-        x2 = F.relu(self.hidden21(x1))
-        x2 = F.relu(self.hidden22(x1))
-        x2 = F.relu(self.hidden23(x1))
-        output2 = self.output2(x1)
+        x2 = F.relu(self.input2(x))
+        x2 = F.relu(self.hidden21(x2))
+        x2 = F.relu(self.hidden22(x2))
+        x2 = F.relu(self.hidden23(x2))
+        output2 = self.output2(x2)
         
-        output = torch.stack((x1, x2), dim=1)
+        output = torch.stack((output1, output2), dim=1)
         return F.softmax(output, dim=1)
 
 class CartPoleAgent(nn.Module):
