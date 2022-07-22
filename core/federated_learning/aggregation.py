@@ -65,7 +65,7 @@ class EvaluatorServer:
     """
     This class is based on the `REINFORCE` algorithm class from
     the evaluator module (`core.evaluator`) for a better aggregation
-    (see the algorithm `FRCCE` - `arXiv:2102.13314v1`)
+    (inspired by the algorithm `FRCCE` - `arXiv:2102.13314v1`)
     """
 
     def __init__(
@@ -94,11 +94,13 @@ class EvaluatorServer:
             if optimizer is None
             else optimizer(self.agent.parameters())
         )
+        self.nworkers = ninput
         self.workers_updates = []
         self.gamma = gamma
         self.delta = 0  # Window for moving average
         self.accuracies = []  # accuracies during training of task model
-        self.window = 1  # window for weighting moving average
+        # self.window = 1  # window for weighting moving average
+        self.alpha = 0.9 # window for exponential moving average
         self.rewards = []
         self.losses = []
         self.selections = [] # selections over time for analysis
@@ -166,11 +168,13 @@ class EvaluatorServer:
         state = torch.tensor(self.accuracies)
         probas = self.agent.forward(state)
         p = 0  # number of participants
+        minp = self.nworkers // 10
         with torch.no_grad():
-            while p == 0:
+            while p <= minp:
                 action = torch.bernoulli(probas)
                 selection = action[:, 0].tolist()
                 p = sum(selection)
+        self.selections.append(selection)
         participants = compress(self.workers_updates, selection)
 
         # Update the global model
@@ -180,7 +184,7 @@ class EvaluatorServer:
         self.workers_updates.clear()
 
         # Compute the reward
-        curr_accuracy = sum((acc * a for acc, a in zip(self.accuracies, selection))) / p
+        curr_accuracy = sum(compress(self.accuracies, selection)) / p
         reward = curr_accuracy - self.delta
         self.rewards.append(reward)
         self.tracking_rewards.append(reward)
@@ -196,15 +200,19 @@ class EvaluatorServer:
             # Compute the loss value
             probas = self.agent.forward(states)
             log_prob = (torch.log(probas) * actions).sum(1)
+            print((-log_prob * rewards.unsqueeze(1)).sum(1))
             loss = (-log_prob * rewards.unsqueeze(1)).sum(1).mean()
             self.losses.append(loss.item())
 
             loss.backward()  # Compute gradients
             self.optimizer.step()  # Apply gradients
 
-        # Update the moving average
-        self.delta = (curr_accuracy + (self.window - 1) * self.delta) / self.window
-        self.window += 1
+        # # Update the moving average
+        # self.delta = (curr_accuracy + (self.window - 1) * self.delta) / self.window
+        # self.window += 1
+
+        # Update the exponential moving average
+        self.delta = self.delta + self.alpha * (curr_accuracy - self.delta)
         self.accuracies.clear()
 
     def reset(self, filename=None):
