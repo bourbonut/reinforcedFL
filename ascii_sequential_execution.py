@@ -179,6 +179,7 @@ for iexp in range(NEXPS):
         "Training accuracies [%]",
         "Testing accuracies [%]",
         "Duration \[s]",
+        "Losses",
         title=f"Experiment {iexp}",
     )
     align = Align.center(table)
@@ -189,23 +190,27 @@ for iexp in range(NEXPS):
                 worker.communicatewith(server)
 
             # Workers evaluate accuracy of the global model
-            # on their local data
+            # on their local testing data
+            start = perf_counter()
             accuracies = evaluate(workers)
             avg_acc = server.global_accuracy(accuracies)
             global_accs[1].append(avg_acc)
 
             # Training loop of workers
-            start = perf_counter()
-            # No save of loss evolution
+
+            # # No save of loss evolution
             # curr_path = exp_path / f"round{r}" / f"epoch{e}"
             # create(curr_path, verbose=False)
             # train(workers, curr_path)
             train(workers)
-            duration = perf_counter() - start
 
+            # Workers evaluate accuracy of global model
+            # on their local training data
             accuracies = evaluate(workers, True)
             avg_acc = server.global_accuracy(accuracies, True)
             global_accs[0].append(avg_acc)
+
+            duration = perf_counter() - start
 
             # Update the table for training average accuracy
             table.add_row(
@@ -213,6 +218,7 @@ for iexp in range(NEXPS):
                 f"{avg_acc:.2%}",
                 f"{global_accs[1][-1]:.2%}",
                 f"{duration:.3f} s",
+                f"{server.batch_loss}",
             )
             live.refresh()
 

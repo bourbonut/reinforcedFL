@@ -99,7 +99,6 @@ class EvaluatorServer:
         self.gamma = gamma
         self.delta = 0  # Window for moving average
         self.accuracies = []  # accuracies during training of task model
-        # self.window = 1  # window for weighting moving average
         self.alpha = 0.9 # window for exponential moving average
         self.rewards = []
         self.losses = []
@@ -107,6 +106,7 @@ class EvaluatorServer:
         self.capacity = capacity
         self.batchs = MovingBatch(capacity, device)
         self.tracking_rewards = []
+        self.batch_loss = []
 
     def send(self):
         """
@@ -200,16 +200,13 @@ class EvaluatorServer:
             # Compute the loss value
             probas = self.agent.forward(states)
             log_prob = (torch.log(probas) * actions).sum(1)
-            print((-log_prob * rewards.unsqueeze(1)).sum(1))
-            loss = (-log_prob * rewards.unsqueeze(1)).sum(1).mean()
+            batch_loss = (-log_prob * rewards.unsqueeze(1)).sum(1)
+            self.batch_loss = batch_loss.tolist()
+            loss = batch_loss.mean()
             self.losses.append(loss.item())
 
             loss.backward()  # Compute gradients
             self.optimizer.step()  # Apply gradients
-
-        # # Update the moving average
-        # self.delta = (curr_accuracy + (self.window - 1) * self.delta) / self.window
-        # self.window += 1
 
         # Update the exponential moving average
         self.delta = self.delta + self.alpha * (curr_accuracy - self.delta)
