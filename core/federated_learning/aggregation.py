@@ -168,11 +168,11 @@ class EvaluatorServer:
         self.batchs.actions.append(action)
         # self.batchs.update_size()
 
-    def update_delta(self):
+    def update_delta(self, accuracies):
         """
         Update the initial value on the exponential moving average
         """
-        self.delta = self.compute_glb_acc(self.global_accuracies)
+        self.delta = self.compute_glb_acc(accuracies)
 
     def update(self):
         """

@@ -184,8 +184,10 @@ for iexp in range(NEXPS):
     )
 
     # Global initial accuracies
-    server.collects_global_accuracies(evaluate(workers))
-    server.update_delta()
+    pair = evaluate(workers, full=True)
+    accuracies, singular_accuracies = zip(*pair)
+    server.update_delta(accuracies)
+    server.collects_global_accuracies(singular_accuracies)
 
     align = Align.center(table)
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
@@ -214,9 +216,10 @@ for iexp in range(NEXPS):
 
             # Workers evaluate accuracy of the global model
             # on their local testing data
-            accuracies = evaluate(workers)
+            pair = evaluate(workers, full=True)
+            accuracies, singular_accuracies = zip(*pair)
             te_avg_acc = server.compute_glb_acc(accuracies)
-            server.collects_global_accuracies(accuracies)
+            server.collects_global_accuracies(singular_accuracies)
             duration = perf_counter() - start
 
             # Train the agent
