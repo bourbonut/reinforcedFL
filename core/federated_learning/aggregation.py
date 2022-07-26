@@ -242,7 +242,6 @@ class EvaluatorServer:
         self.accuracies.clear()
         self.global_accuracies.clear()
         self.delta = 0
-        self.window = 1
         if filename is not None:
             attrbs = {"title": "Evolution of loss function"}
             attrbs.update({"xrange": (0, len(self.losses) - 1)})
@@ -254,6 +253,9 @@ class EvaluatorServer:
         self.losses.clear()
 
     def finish(self, path):
+        """
+        Save results at the end of the training for the agent
+        """
         filename = path / "rl_rewards.png"
         attrbs = {"title": "Evolution of reward function"}
         attrbs.update({"xrange": (0, len(self.tracking_rewards) - 1)})
