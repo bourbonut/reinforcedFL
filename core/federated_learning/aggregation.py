@@ -241,6 +241,7 @@ class EvaluatorServer:
         self.rewards.clear()
         self.accuracies.clear()
         self.global_accuracies.clear()
+        self.batch_loss.clear()
         self.delta = 0
         if filename is not None:
             attrbs = {"title": "Evolution of loss function"}
