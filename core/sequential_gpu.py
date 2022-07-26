@@ -11,9 +11,9 @@ def train(workers, path=None):
         worker.train(filename=path)
 
 
-def evaluate(workers, ontrain=False, perlabel=False):
+def evaluate(workers, ontrain=False, perlabel=False, full=False):
     """
     Evaluate the global model on local data of workers in sequential
     """
 
-    return [worker.evaluate(ontrain, perlabel) for worker in workers]
+    return [worker.evaluate(ontrain, perlabel, full) for worker in workers]

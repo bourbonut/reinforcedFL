@@ -30,18 +30,18 @@ def train(workers, path=None):
         thread.join()
 
 
-def evaluate(workers, ontrain=False, perlabel=False):
+def evaluate(workers, ontrain=False, perlabel=False, full=False):
     """
     Evaluate the global model on local data of workers in parallel
     """
     accuracies = [0] * len(workers)
 
-    def eval_worker(worker, idx, ontrain, perlabel, accuracies):
-        acc = worker.evaluate(ontrain, perlabel)
+    def eval_worker(worker, idx, ontrain, perlabel, full, accuracies):
+        acc = worker.evaluate(ontrain, perlabel, full)
         accuracies[idx] = acc
 
     threads = [
-        Thread(target=eval_worker, args=(worker, i, ontrain, perlabel, accuracies))
+        Thread(target=eval_worker, args=(worker, i, ontrain, perlabel, full, accuracies))
         for i, worker in enumerate(workers)
     ]
     for thread in threads:

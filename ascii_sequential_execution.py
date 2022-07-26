@@ -201,9 +201,10 @@ for iexp in range(NEXPS):
 
             # Workers evaluate accuracy of global model
             # on their local training data
-            accuracies = evaluate(workers, True)
+            pair = evaluate(workers, True, full=True)
+            accuracies, singular_accuracies = zip(*pair)
             tr_avg_acc = server.compute_glb_acc(accuracies, True)
-            server.collects_training_accuracies(accuracies)
+            server.collects_training_accuracies(singular_accuracies)
 
             # Server downloads all local updates
             for worker in workers:

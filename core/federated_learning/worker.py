@@ -80,12 +80,12 @@ class Worker:
             attrbs.update({"x_title": "Steps", "y_title": "Loss values"})
             lineXY({"Losses": losses}, filename, **attrbs)
 
-    def _evaluate(self, train=False, label=None):
+    def _evaluate(self, train=False, label=None, full=False):
         """
         Compute the accuracy on the local data given the parameters
         See `evaluate` for global usage
 
-        Parameters
+        Parameters:
 
             train (bool):
                 True for evaluation on data for training else
@@ -93,6 +93,9 @@ class Worker:
             label (int):
                 Evaluate on data given the label else evaluate
                 on all available data
+            full (bool):
+                Return two values if True, the weighted accuracy
+                and the non weighted accuracy
         """
         data = self._train if train else self._test
         if label is None:
@@ -110,13 +113,14 @@ class Worker:
             _, predicted = torch.max(predictions.data, 1)
             total += labels.size(0)
             correct += (predicted == labels.to(self.device)).sum().item()
-        return n * correct / total
+        accuracy = correct / total
+        return [n * accuracy, accuracy] if full else n * accuracy
 
-    def evaluate(self, train=False, perlabel=False):
+    def evaluate(self, train=False, perlabel=False, full=False):
         """
         Compute the accuracy on the local data given the parameters
 
-        Parameters
+        Parameters:
 
             train (bool):
                 True for evaluation on data for training else
@@ -125,9 +129,12 @@ class Worker:
                 The evaluation is done label per label if it is True
                 which means the accuracy is computed as the average of
                 the accuracies per label
+            full (bool):
+                Return a list of pair values if True, the weighted 
+                accuracy and the non weighted accuracy
         """
         if perlabel:
             labels = self._train.labels if train else self._test.labels
-            return statistics.mean([self._evaluate(train, label) for label in labels])
+            return statistics.mean([self._evaluate(train, label, full) for label in labels])
         else:
-            return self._evaluate(train)
+            return self._evaluate(train, full=full)
