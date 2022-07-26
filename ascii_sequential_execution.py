@@ -182,50 +182,56 @@ for iexp in range(NEXPS):
         "Losses",
         title=f"Experiment {iexp}",
     )
+
+    # Global initial accuracies
+    server.collects_global_accuracies(evaluate(workers))
+    server.update_delta()
+
     align = Align.center(table)
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
         for r in range(ROUNDS):
+            start = perf_counter()
+
             # Workers download the global model
             for worker in workers:
                 worker.communicatewith(server)
 
-            # Workers evaluate accuracy of the global model
-            # on their local testing data
-            start = perf_counter()
-            accuracies = evaluate(workers)
-            avg_acc = server.global_accuracy(accuracies)
-            global_accs[1].append(avg_acc)
-
             # Training loop of workers
-
-            # # No save of loss evolution
-            # curr_path = exp_path / f"round{r}" / f"epoch{e}"
-            # create(curr_path, verbose=False)
-            # train(workers, curr_path)
             train(workers)
 
             # Workers evaluate accuracy of global model
             # on their local training data
             accuracies = evaluate(workers, True)
-            avg_acc = server.global_accuracy(accuracies, True)
-            global_accs[0].append(avg_acc)
-
-            duration = perf_counter() - start
-
-            # Update the table for training average accuracy
-            table.add_row(
-                str(r + 1),
-                f"{avg_acc:.2%}",
-                f"{global_accs[1][-1]:.2%}",
-                f"{duration:.3f} s",
-                f"{server.batch_loss}",
-            )
-            live.refresh()
+            tr_avg_acc = server.global_accuracy(accuracies, True)
+            server.collects_training_accuracies(accuracies)
 
             # Server downloads all local updates
             for worker in workers:
                 server.communicatewith(worker)
             server.update()
+
+            # Workers evaluate accuracy of the global model
+            # on their local testing data
+            accuracies = evaluate(workers)
+            te_avg_acc = server.global_accuracy(accuracies)
+            server.collects_global_accuracies(accuracies)
+            duration = perf_counter() - start
+
+            # Train the agent
+            server.train_agent()
+
+            # Update the table
+            table.add_row(
+                str(r + 1),
+                f"{tr_avg_acc:.2%}",
+                f"{te_avg_acc:.2%}",
+                f"{duration:.3f} s",
+                f"{server.batch_loss}",
+            )
+            live.refresh()
+
+            # Update global_accs
+            global_accs.append((tr_avg_acc, te_avg_acc))
 
     # Reset the server
     server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
@@ -239,8 +245,7 @@ for iexp in range(NEXPS):
     with open(exp_path / f"global_accs-{iexp}.pkl", "wb") as file:
         pickle.dump(global_accs, file)
 
-    global_accs[0].clear()
-    global_accs[1].clear()
+    global_accs.clear()
 
 server.finish(exp_path / "agent")
 console.print("Finished.")

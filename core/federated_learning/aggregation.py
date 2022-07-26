@@ -3,6 +3,7 @@ from collections import deque
 from itertools import compress
 from utils.plot import lineXY
 import torch, pickle
+import statistics
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -99,14 +100,15 @@ class EvaluatorServer:
         self.gamma = gamma
         self.delta = 0  # Window for moving average
         self.accuracies = []  # accuracies during training of task model
-        self.alpha = 0.9 # window for exponential moving average
-        self.rewards = []
-        self.losses = []
-        self.selections = [] # selections over time for analysis
+        self.global_accuracies = [0] * ninput  # accuracies during testing of global task model
+        self.alpha = 0.9  # window for exponential moving average
         self.capacity = capacity
         self.batchs = MovingBatch(capacity, device)
         self.tracking_rewards = []
+        self.rewards = []
+        self.losses = []
         self.batch_loss = []
+        self.selections = []  # selections over time for analysis
 
     def send(self):
         """
@@ -120,20 +122,27 @@ class EvaluatorServer:
         """
         self.workers_updates.append(worker_update)
 
-    def collect_accuracy(self, worker_accuracy):
+    def collects_training_accuracies(self, accuracies):
         """
-        The server collects local model accuracy through this method
+        The server collects local model accuracy
+        on local worker data through this method
         """
-        self.accuracies.append(worker_accuracy)
+        self.accuracies.extend(accuracies)
+
+    def collects_global_accuracies(self, accuracies):
+        """
+        The server collects global model accuracy
+        on local worker data through this method
+        """
+        self.global_accuracies.extend(accuracies)
 
     def communicatewith(self, worker):
         """
         For convenience, this method is used for communication.
         """
         self.receive(worker.send(False))
-        self.collect_accuracy(worker.evaluate(train=True, perlabel=True))
 
-    def global_accuracy(self, workers_accuracies, train=False):
+    def compute_glb_acc(self, workers_accuracies, train=False):
         """
         Compute the global accuracy based on the Federated Averaging algorithm
         """
@@ -159,13 +168,19 @@ class EvaluatorServer:
         self.batchs.actions.append(action)
         self.batchs.update_size()
 
+    def update_delta(self):
+        """
+        Update the initial value on the exponential moving average
+        """
+        self.delta = self.compute_glb_acc(self.global_accuracies)
+
     def update(self):
         """
         Update the global model and the agent policy
         """
         # Selection of gradients which are going
         # to participate to the next aggregation
-        state = torch.tensor(self.accuracies)
+        state = torch.tensor(self.accuracies) - torch.tensor(self.global_accuracies)
         probas = self.agent.forward(state)
         p = 0  # number of participants
         minp = self.nworkers // 10
@@ -177,20 +192,25 @@ class EvaluatorServer:
         self.selections.append(selection)
         participants = compress(self.workers_updates, selection)
 
+        # Update batch array
+        self.update_batch(state, action.T)
+
         # Update the global model
         new_weights = map(lambda layer: sum(layer) / p, zip(*participants))
         for target_param, param in zip(self.global_model.parameters(), new_weights):
             target_param.data.copy_(param.data)
         self.workers_updates.clear()
+        self.global_accuracies.clear()
 
+    def train_agent(self):
+        """
+        Train the agent
+        """
         # Compute the reward
-        curr_accuracy = sum(compress(self.accuracies, selection)) / p
+        curr_accuracy = self.compute_glb_acc(self.global_accuracies)
         reward = curr_accuracy - self.delta
         self.rewards.append(reward)
         self.tracking_rewards.append(reward)
-
-        # Update batch array
-        self.update_batch(self.accuracies, action.T)
 
         # Optimization if batch is complete
         if self.batchs.isfull():
@@ -220,6 +240,7 @@ class EvaluatorServer:
         self.workers_updates.clear()
         self.rewards.clear()
         self.accuracies.clear()
+        self.global_accuracies.clear()
         self.delta = 0
         self.window = 1
         if filename is not None:
@@ -276,7 +297,7 @@ class FederatedAveraging:
         """
         self.receive(worker.send())
 
-    def update(self):
+    def update(self, workers):
         """
         Update the global model based on Federated Averaging algorithm
 
@@ -290,7 +311,7 @@ class FederatedAveraging:
             target_param.data.copy_(param.data)
         self.workers_updates.clear()
 
-    def global_accuracy(self, workers_accuracies, train=False):
+    def compute_glb_acc(self, workers_accuracies, train=False):
         """
         Compute the global accuracy based on the Federated Averaging algorithm
         """
