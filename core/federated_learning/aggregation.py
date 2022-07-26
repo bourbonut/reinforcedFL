@@ -100,7 +100,7 @@ class EvaluatorServer:
         self.gamma = gamma
         self.delta = 0  # Window for moving average
         self.accuracies = []  # accuracies during training of task model
-        self.global_accuracies = [0] * ninput  # accuracies during testing of global task model
+        self.global_accuracies = []  # accuracies during testing of global task model
         self.alpha = 0.9  # window for exponential moving average
         self.capacity = capacity
         self.batchs = MovingBatch(capacity, device)
@@ -163,10 +163,10 @@ class EvaluatorServer:
         """
         Update MovingBatch class
         """
-        self.batchs.rewards.append(self.discount_rewards())
+        # self.batchs.rewards.append(self.discount_rewards())
         self.batchs.states.append(state)
         self.batchs.actions.append(action)
-        self.batchs.update_size()
+        # self.batchs.update_size()
 
     def update_delta(self):
         """
@@ -180,6 +180,8 @@ class EvaluatorServer:
         """
         # Selection of gradients which are going
         # to participate to the next aggregation
+        print(f"{self.accuracies = }")
+        print(f"{self.global_accuracies = }")
         state = torch.tensor(self.accuracies) - torch.tensor(self.global_accuracies)
         probas = self.agent.forward(state)
         p = 0  # number of participants
@@ -193,7 +195,7 @@ class EvaluatorServer:
         participants = compress(self.workers_updates, selection)
 
         # Update batch array
-        self.update_batch(state, action.T)
+        self.update_batch(state.tolist(), action.T)
 
         # Update the global model
         new_weights = map(lambda layer: sum(layer) / p, zip(*participants))
@@ -211,6 +213,9 @@ class EvaluatorServer:
         reward = curr_accuracy - self.delta
         self.rewards.append(reward)
         self.tracking_rewards.append(reward)
+
+        self.batchs.rewards.append(self.discount_rewards())
+        self.batchs.update_size()
 
         # Optimization if batch is complete
         if self.batchs.isfull():

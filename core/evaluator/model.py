@@ -51,6 +51,7 @@ class ReinforceAgent(nn.Module):
         output2 = self.output2(x2)
         
         output = torch.stack((output1, output2), dim=1)
+        print(f"{output = }")
         return F.softmax(output, dim=1)
 
 class CartPoleAgent(nn.Module):
