@@ -91,7 +91,7 @@ class EvaluatorServer:
         device = self.global_model.device
         self.agent = ReinforceAgent(ninput, noutput, device).to(device)
         self.optimizer = (
-            torch.optim.Adam(self.agent.parameters(), lr=0.01)
+            torch.optim.Adam(self.agent.parameters(), lr=0.001)
             if optimizer is None
             else optimizer(self.agent.parameters())
         )
@@ -180,8 +180,6 @@ class EvaluatorServer:
         """
         # Selection of gradients which are going
         # to participate to the next aggregation
-        print(f"{self.accuracies = }")
-        print(f"{self.global_accuracies = }")
         state = torch.tensor(self.accuracies) - torch.tensor(self.global_accuracies)
         probas = self.agent.forward(state)
         p = 0  # number of participants

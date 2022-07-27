@@ -168,7 +168,7 @@ create(exp_path / "agent", verbose=False)
 
 # Global accuracies : first list for training
 # second list for testing
-global_accs = [[], []]
+global_accs = []
 
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))
