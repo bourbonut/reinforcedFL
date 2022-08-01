@@ -1,6 +1,7 @@
 from core.evaluator.model import ReinforceAgent
 from collections import deque
 from itertools import compress
+from math import log
 from utils.plot import lineXY
 import torch, pickle
 import statistics
@@ -99,6 +100,7 @@ class EvaluatorServer:
         self.workers_updates = []
         self.gamma = gamma
         self.delta = 0  # Window for moving average
+        self.speed = log(1e-6) / log(1 - 0.95) 
         self.accuracies = []  # accuracies during training of task model
         self.global_accuracies = []  # accuracies during testing of global task model
         self.alpha = 0.9  # window for exponential moving average
@@ -208,7 +210,8 @@ class EvaluatorServer:
         """
         # Compute the reward
         curr_accuracy = self.compute_glb_acc(accuracies)
-        reward = curr_accuracy - self.delta
+        reward = (1 - (0.95 - curr_accuracy)) ** self.speed
+        # reward = curr_accuracy - self.delta
         self.rewards.append(reward)
         self.tracking_rewards.append(reward)
 
@@ -232,7 +235,7 @@ class EvaluatorServer:
             self.optimizer.step()  # Apply gradients
 
         # Update the exponential moving average
-        self.delta = self.delta + self.alpha * (curr_accuracy - self.delta)
+        # self.delta = self.delta + self.alpha * (curr_accuracy - self.delta)
         self.accuracies.clear()
 
     def reset(self, filename=None):
