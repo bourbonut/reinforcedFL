@@ -223,7 +223,7 @@ for iexp in range(NEXPS):
             duration = perf_counter() - start
 
             # Train the agent
-            server.train_agent()
+            server.train_agent(accuracies)
 
             # Update the table
             table.add_row(

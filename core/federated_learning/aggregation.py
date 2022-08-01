@@ -91,7 +91,7 @@ class EvaluatorServer:
         device = self.global_model.device
         self.agent = ReinforceAgent(ninput, noutput, device).to(device)
         self.optimizer = (
-            torch.optim.Adam(self.agent.parameters(), lr=0.001)
+            torch.optim.Adam(self.agent.parameters(), lr=1e-3)
             if optimizer is None
             else optimizer(self.agent.parameters())
         )
@@ -202,12 +202,12 @@ class EvaluatorServer:
         self.workers_updates.clear()
         self.global_accuracies.clear()
 
-    def train_agent(self):
+    def train_agent(self, accuracies):
         """
         Train the agent
         """
         # Compute the reward
-        curr_accuracy = self.compute_glb_acc(self.global_accuracies)
+        curr_accuracy = self.compute_glb_acc(accuracies)
         reward = curr_accuracy - self.delta
         self.rewards.append(reward)
         self.tracking_rewards.append(reward)
