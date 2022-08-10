@@ -6,7 +6,6 @@ Module which deals with :
 """
 
 from .federated_learning.aggregation import FederatedAveraging, EvaluatorServer
+from .federated_learning.participation import Scheduler
 from .federated_learning.worker import Worker
-from .federated_learning import participation
 
-PARTICIPATION = {"all": participation.entirely, "randomly": participation.randomly}

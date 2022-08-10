@@ -97,7 +97,7 @@ class EvaluatorServer:
             else optimizer(self.agent.parameters())
         )
         self.nworkers = ninput
-        self.workers_updates = []
+        self.participants_updates = []
         self.gamma = gamma
         self.delta = 0  # Window for moving average
         self.speed = log(1e-6) / log(1 - 0.95) 
@@ -122,7 +122,7 @@ class EvaluatorServer:
         """
         The server collects local model parameters through this method
         """
-        self.workers_updates.append(worker_update)
+        self.participants_updates.append(worker_update)
 
     def collects_training_accuracies(self, accuracies):
         """
@@ -192,7 +192,7 @@ class EvaluatorServer:
                 selection = action[:, 0].tolist()
                 p = sum(selection)
         self.selections.append(selection)
-        participants = compress(self.workers_updates, selection)
+        participants = compress(self.participants_updates, selection)
 
         # Update batch array
         self.update_batch(state.tolist(), action.T)
@@ -201,7 +201,7 @@ class EvaluatorServer:
         new_weights = map(lambda layer: sum(layer) / p, zip(*participants))
         for target_param, param in zip(self.global_model.parameters(), new_weights):
             target_param.data.copy_(param.data)
-        self.workers_updates.clear()
+        self.participants_updates.clear()
         self.global_accuracies.clear()
 
     def train_agent(self, accuracies):
@@ -243,7 +243,7 @@ class EvaluatorServer:
         Reset working attributes
         """
         self.batchs.clear()
-        self.workers_updates.clear()
+        self.participants_updates.clear()
         self.rewards.clear()
         self.accuracies.clear()
         self.global_accuracies.clear()
@@ -284,9 +284,9 @@ class FederatedAveraging:
 
     def __init__(self, global_model, size_traindata, size_testdata, *args, **kwargs):
         self.global_model = global_model
-        self.workers_updates = []
-        self.n = size_traindata
-        self.t = size_testdata
+        self.participants_updates = []
+        self.n = size_traindata # list
+        self.t = size_testdata # list
 
     def send(self):
         """
@@ -298,7 +298,7 @@ class FederatedAveraging:
         """
         The server collects local model parameters through this method
         """
-        self.workers_updates.append(worker_update)
+        self.participants_updates.append(worker_update)
 
     def communicatewith(self, worker):
         """
@@ -306,7 +306,11 @@ class FederatedAveraging:
         """
         self.receive(worker.send())
 
-    def update(self, workers):
+    def local_size(self, indices, train=True):
+        sizes = self.n if train else self.t
+        return sum((sizes[i] for i in indices))
+
+    def update(self, indices):
         """
         Update the global model based on Federated Averaging algorithm
 
@@ -315,17 +319,20 @@ class FederatedAveraging:
             In other words, a worker update is : `[nk * w for w in weights]` where
             `nk` is the number of local examples.
         """
-        new_weights = map(lambda layer: sum(layer) / self.n, zip(*self.workers_updates))
+        p = self.local_size(indices, True)
+        new_weights = map(lambda layer: sum(layer) / p, zip(*self.participants_updates))
         for target_param, param in zip(self.global_model.parameters(), new_weights):
             target_param.data.copy_(param.data)
-        self.workers_updates.clear()
+        self.participants_updates.clear()
 
-    def compute_glb_acc(self, workers_accuracies, train=False):
+    def compute_glb_acc(self, workers_accuracies, indices, train=False):
         """
         Compute the global accuracy based on the Federated Averaging algorithm
         """
-        size = self.n if train else self.t
-        return sum(workers_accuracies) / size
+        return sum(workers_accuracies) / self.local_size(indices, train)
+
+    def train_agent(self, *args, **kwargs):
+        pass
 
     def reset(self, *args, **kwargs):
         pass

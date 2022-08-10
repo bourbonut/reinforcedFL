@@ -3,10 +3,11 @@ from torch.distributions import Bernoulli
 from torch.nn import functional as F
 import torch
 from math import log
+import random, pickle
 
 
 class Scheduler:
-    def __init__(self, ninput, noutput, device, **kwargs):
+    def __init__(self, ninput, noutput, device, path, **kwargs):
         self.agent = Policy(ninput, noutput, device)
         self.optimizer = torch.optim.Adam(self.agent.parameters(), lr=3e-2)
         self.speed = log(1e-6) / log(1 - 0.95)
@@ -15,6 +16,9 @@ class Scheduler:
         self.critic_value = None
         self.action = None
         self.log_prob = None
+        self.action_dim = noutput
+        self.path = path
+        self.i = 0
 
     def discount_reward(self):
         R = 0
@@ -28,10 +32,14 @@ class Scheduler:
         return R
 
     def select_next_partipants(self, state):
+        if state == []:
+            return random.sample(list(range(self.action_dim)), self.action_dim // 10)
+        state = torch.tensor(state)
         actor_probas, self.critic_value = self.agent(state)
         m = Bernoulli(actor_probas)
         self.action = m.sample()
         self.log_prob = m.log_prob(self.action)
+        return self.action.tolist()
 
     def compute_reward(self, current_accuracy):
         reward = (1 - (0.95 - current_accuracy)) ** self.speed
@@ -47,3 +55,11 @@ class Scheduler:
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+
+    def reset(self):
+        with open(self.path / f"rewards-{self.i}.pkl", "wb") as file:
+            pickle.dump(self.rewards, file)
+        self.rewards.clear()
+        self.critic_value = None
+        self.action = None
+        self.log_prob = None

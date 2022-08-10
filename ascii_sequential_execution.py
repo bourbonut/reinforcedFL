@@ -13,6 +13,7 @@ from rich.live import Live
 from rich.panel import Panel
 from pathlib import Path
 from time import perf_counter
+import random
 
 parser = argparse.ArgumentParser()
 parser.add_argument(dest="environment", help="environment path")
@@ -144,6 +145,15 @@ with Live(panel, auto_refresh=False) as live:
     panel.renderable = Group(*texts)
     live.refresh()
 
+    # Initialization of the scheduler (participation agent)
+    text.append(Align.center("[cyan]Initialization of the scheduler[/]")
+    scheduler = Scheduler(
+        parameters["model"]["ninput"], parameters["model"]["noutput"], device, exp_path / "scheduler",
+    )
+    text[-1].append(Align.center("[green]The scheduler is successfully initialized.[/]")
+    panel.renderable = Group(*texts)
+    live.refresh()
+
     # Initialization of workers
     texts.append(Align.center("[cyan]Initialization of the workers[/]"))
     panel.renderable = Group(*texts)
@@ -165,10 +175,12 @@ with Live(panel, auto_refresh=False) as live:
 
 # Create a directory
 create(exp_path / "agent", verbose=False)
+create(exp_path / "scheduler", verbose=False)
 
 # Global accuracies : first list for training
 # second list for testing
 global_accs = []
+state = []
 
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))
@@ -194,24 +206,29 @@ for iexp in range(NEXPS):
         for r in range(ROUNDS):
             start = perf_counter()
 
+            # Selection of future participants
+            # indices_participants = scheduler.select_next_partipants(state)
+            indices_participants = random.choice(list(range(len(workers))), len(workers) // 10)
+            participants = [workers[i] for i in indices_participants]
+
             # Workers download the global model
-            for worker in workers:
+            for worker in participants:
                 worker.communicatewith(server)
 
             # Training loop of workers
-            train(workers)
+            train(participants)
 
             # Workers evaluate accuracy of global model
             # on their local training data
-            pair = evaluate(workers, True, full=True)
+            pair = evaluate(participants, True, full=True)
             accuracies, singular_accuracies = zip(*pair)
-            tr_avg_acc = server.compute_glb_acc(accuracies, True)
+            tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
             server.collects_training_accuracies(singular_accuracies)
 
             # Server downloads all local updates
-            for worker in workers:
+            for worker in participants:
                 server.communicatewith(worker)
-            
+
             server.update()
 
             # Workers evaluate accuracy of the global model
@@ -219,7 +236,7 @@ for iexp in range(NEXPS):
             pair = evaluate(workers, full=True)
             accuracies, singular_accuracies = zip(*pair)
             te_avg_acc = server.compute_glb_acc(accuracies)
-            server.collects_global_accuracies(singular_accuracies)
+            server.collects_global_accuracies(singular_accuracies, indices_participants)
             duration = perf_counter() - start
 
             # Train the agent
@@ -241,6 +258,8 @@ for iexp in range(NEXPS):
     # Reset the server
     server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
     server.global_model = Model(nclasses, device).to(device)
+    # scheduler.reset()
+    state.clear()
 
     # Reset workers
     for worker in workers:
