@@ -2,6 +2,7 @@ from torch.utils.data import DataLoader
 from torch import optim, nn
 import pickle, torch, statistics
 from utils.plot import lineXY
+import random
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -11,6 +12,9 @@ class Worker:
     Class which represents a 'worker' and communicate with the server.
     It holds the local data and a model.
     """
+
+    GROUPS = [0.5, 0.7, 1]  # second / batch
+    BANDWIDTHS = (((10, 3), (5e-2, 5e-3)), ((1, 1e-1), (5e-4, 5e-5)))
 
     def __init__(
         self,
@@ -27,6 +31,14 @@ class Worker:
         self._train, self._test = data
         self.toloader = lambda data: DataLoader(
             data, batch_size=batch_size, num_workers=1
+        )
+        self.speed = self.GROUPS[random.choice(range(len(self.GROUPS)))]
+        self.network = random.choice(self.BANDWIDTHS)
+        self.bandwidth_download = random.normalvariate(
+            self.network[0][0], self.network[0][1]
+        )
+        self.bandwidth_upload = random.normalvariate(
+            self.network[1][0], self.network[1][1]
         )
         self.model = model
         self.device = self.model.device
@@ -130,11 +142,13 @@ class Worker:
                 which means the accuracy is computed as the average of
                 the accuracies per label
             full (bool):
-                Return a list of pair values if True, the weighted 
+                Return a list of pair values if True, the weighted
                 accuracy and the non weighted accuracy
         """
         if perlabel:
             labels = self._train.labels if train else self._test.labels
-            return statistics.mean([self._evaluate(train, label, full) for label in labels])
+            return statistics.mean(
+                [self._evaluate(train, label, full) for label in labels]
+            )
         else:
             return self._evaluate(train, full=full)
