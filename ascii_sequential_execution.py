@@ -137,8 +137,8 @@ with Live(panel, auto_refresh=False) as live:
     live.refresh()
     server = server_class(
         Model(nclasses, device).to(device),
-        size_traindata,
-        size_testdata,
+        [],
+        [],
         **parameters["model"],
     )
     texts[-1] = Align.center("[green]The server is successfully initialized.[/]")
@@ -146,11 +146,11 @@ with Live(panel, auto_refresh=False) as live:
     live.refresh()
 
     # Initialization of the scheduler (participation agent)
-    text.append(Align.center("[cyan]Initialization of the scheduler[/]")
-    scheduler = Scheduler(
-        parameters["model"]["ninput"], parameters["model"]["noutput"], device, exp_path / "scheduler",
-    )
-    text[-1].append(Align.center("[green]The scheduler is successfully initialized.[/]")
+    texts.append(Align.center("[cyan]Initialization of the scheduler[/]"))
+    # scheduler = Scheduler(
+    #    parameters["model"]["ninput"], parameters["model"]["noutput"], device, exp_path / "scheduler",
+    #)
+    texts[-1] = Align.center("[green]The scheduler is successfully initialized.[/]")
     panel.renderable = Group(*texts)
     live.refresh()
 
@@ -169,6 +169,8 @@ with Live(panel, auto_refresh=False) as live:
         )
         for i, model in enumerate(models)
     )
+    server.n = [len(worker._train) for worker in workers]
+    server.t = [len(worker._test) for worker in workers]
     texts[-1] = Align.center("[green]Workers are successfully initialized.[/]")
     panel.renderable = Group(*texts)
     live.refresh()
@@ -199,7 +201,7 @@ for iexp in range(NEXPS):
     pair = evaluate(workers, full=True)
     accuracies, singular_accuracies = zip(*pair)
     server.update_delta(accuracies)
-    server.collects_global_accuracies(singular_accuracies)
+    # server.collects_global_accuracies(singular_accuracies)
 
     align = Align.center(table)
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
@@ -208,7 +210,7 @@ for iexp in range(NEXPS):
 
             # Selection of future participants
             # indices_participants = scheduler.select_next_partipants(state)
-            indices_participants = random.choice(list(range(len(workers))), len(workers) // 10)
+            indices_participants = random.sample(list(range(len(workers))), len(workers) // 10)
             participants = [workers[i] for i in indices_participants]
 
             # Workers download the global model
@@ -223,20 +225,23 @@ for iexp in range(NEXPS):
             pair = evaluate(participants, True, full=True)
             accuracies, singular_accuracies = zip(*pair)
             tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
-            server.collects_training_accuracies(singular_accuracies)
+            # server.collects_training_accuracies(singular_accuracies)
 
             # Server downloads all local updates
             for worker in participants:
                 server.communicatewith(worker)
 
-            server.update()
+            server.update(indices_participants)
+
+            for worker in workers:
+                worker.communicatewith(server)
 
             # Workers evaluate accuracy of the global model
             # on their local testing data
             pair = evaluate(workers, full=True)
             accuracies, singular_accuracies = zip(*pair)
-            te_avg_acc = server.compute_glb_acc(accuracies)
-            server.collects_global_accuracies(singular_accuracies, indices_participants)
+            te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
+            # server.collects_global_accuracies(singular_accuracies, indices_participants)
             duration = perf_counter() - start
 
             # Train the agent

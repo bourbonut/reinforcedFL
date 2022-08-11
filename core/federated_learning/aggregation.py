@@ -287,6 +287,7 @@ class FederatedAveraging:
         self.participants_updates = []
         self.n = size_traindata # list
         self.t = size_testdata # list
+        self.batch_loss = []
 
     def send(self):
         """
@@ -330,6 +331,9 @@ class FederatedAveraging:
         Compute the global accuracy based on the Federated Averaging algorithm
         """
         return sum(workers_accuracies) / self.local_size(indices, train)
+    
+    def update_delta(self, *args, **kwargs):
+        pass
 
     def train_agent(self, *args, **kwargs):
         pass
