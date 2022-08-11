@@ -15,6 +15,7 @@ class Worker:
 
     GROUPS = [0.5, 0.7, 1]  # second / batch
     BANDWIDTHS = (((10, 3), (5e-2, 5e-3)), ((1, 1e-1), (5e-4, 5e-5)))
+    NB_PARAMS = 1199882 # number of parameters
 
     def __init__(
         self,
@@ -70,6 +71,13 @@ class Worker:
         For convenience, this method is used for communication.
         """
         self.receive(aggregator.send())
+
+    def compute_times(self):
+        return [
+            self.speed * (len(self._train) // self.batch_size) * self.epochs,
+            self.NB_PARAMS / self.bandwidth_upload,
+            self.NB_PARAMS / self.bandwidth_download,
+        ]
 
     def train(self, filename=None):
         """

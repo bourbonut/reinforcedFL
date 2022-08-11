@@ -6,6 +6,11 @@ from math import log
 import random, pickle
 
 
+def grouped(list_, k):
+    for i in range(len(list_) // k):
+        yield list_[k * i : k * (i + 1)]
+
+
 class Scheduler:
     def __init__(self, ninput, noutput, device, path, **kwargs):
         self.agent = Policy(ninput, noutput, device)
@@ -19,6 +24,8 @@ class Scheduler:
         self.action_dim = noutput
         self.path = path
         self.i = 0
+        self.loss = 0
+        self.k = ninput // noutput
 
     def discount_reward(self):
         R = 0
@@ -41,9 +48,15 @@ class Scheduler:
         self.log_prob = m.log_prob(self.action)
         return self.action.tolist()
 
-    def compute_reward(self, current_accuracy):
-        reward = (1 - (0.95 - current_accuracy)) ** self.speed
+    def compute_reward(self, worker_times):
+        action = self.action.tolist()
+        iterator = zip(action, grouped(worker_times, self.k))
+        reward = -sum((a * sum(time) for a, time in iterator))
         self.rewards.append(reward)
+
+    # def compute_reward(self, current_accuracy):
+    #     reward = (1 - (0.95 - current_accuracy)) ** self.speed
+    #     self.rewards.append(reward)
 
     def update(self):
         R = self.discount_reward()
@@ -52,6 +65,7 @@ class Scheduler:
         value_loss = F.smooth_l1_loss(self.critic_value, torch.tensor([R]))
 
         loss = policy_loss + value_loss
+        self.loss = loss.item()
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -63,3 +77,5 @@ class Scheduler:
         self.critic_value = None
         self.action = None
         self.log_prob = None
+        self.i += 1
+        self.loss = 0
