@@ -13,8 +13,9 @@ def grouped(list_, k):
 
 class Scheduler:
     def __init__(self, ninput, noutput, device, path, **kwargs):
-        self.agent = Policy(ninput, noutput, device)
+        self.agent = Policy(ninput, noutput, device).to(device)
         self.optimizer = torch.optim.Adam(self.agent.parameters(), lr=3e-2)
+        self.device = device
         self.speed = log(1e-6) / log(1 - 0.95)
         self.gamma = 0.99
         self.rewards = []
@@ -40,18 +41,33 @@ class Scheduler:
 
     def select_next_partipants(self, state):
         if state == []:
-            return random.sample(list(range(self.action_dim)), self.action_dim // 10)
-        state = torch.tensor(state)
+            return sorted(random.sample(list(range(self.action_dim)), self.action_dim // 10))
+            #return sorted(random.sample(list(range(self.action_dim)), self.action_dim))
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        state = state / torch.norm(state, dim=0)
+        state = state.flatten()
         actor_probas, self.critic_value = self.agent(state)
+        #print(f"{actor_probas = }")
+        #print(f"{self.critic_value = }")
         m = Bernoulli(actor_probas)
         self.action = m.sample()
         self.log_prob = m.log_prob(self.action)
-        return self.action.tolist()
+        action = self.action.type(torch.int).tolist()
+        return [i for i in range(len(action)) if action[i]]
+    
+    def grouped(self, list_):
+        k = self.k
+        for i in range(len(list_) // k):
+            yield list_[k * i : k * (i + 1)]
 
     def compute_reward(self, worker_times):
-        action = self.action.tolist()
-        iterator = zip(action, grouped(worker_times, self.k))
-        reward = -sum((a * sum(time) for a, time in iterator))
+        # iterator = zip(action, self.grouped(worker_times))
+        # reward = -max((a * sum(time) for a, time in iterator))
+        action = self.action.clone().to("cpu")
+        worker_times = torch.tensor(worker_times).view(-1, self.k)
+        worker_times = worker_times / torch.norm(worker_times, dim=0)
+        reward = torch.max(worker_times.sum(1) * action).item()
+        #print(f"{reward = }")
         self.rewards.append(reward)
 
     # def compute_reward(self, current_accuracy):
@@ -61,9 +77,11 @@ class Scheduler:
     def update(self):
         R = self.discount_reward()
         advantage = R - self.critic_value.item()
-        policy_loss = -self.log_prob * advantage
-        value_loss = F.smooth_l1_loss(self.critic_value, torch.tensor([R]))
+        policy_loss = -self.log_prob.sum() * advantage
+        value_loss = F.smooth_l1_loss(self.critic_value, torch.tensor([R]).to(self.device))
 
+        #print(f"{policy_loss = }")
+        #print(f"{value_loss = }")
         loss = policy_loss + value_loss
         self.loss = loss.item()
         self.optimizer.zero_grad()

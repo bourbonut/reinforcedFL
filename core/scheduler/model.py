@@ -85,6 +85,7 @@ class Policy(nn.Module):
         x = F.relu(self.input(x))
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
-        actor_probas = torch.tanh(self.actor_output(x))
+        a = torch.tanh(self.actor_output(x))
+        actor_probas = (a + 1) * 0.5
         critic_value = self.critic_output(x)
         return actor_probas, critic_value

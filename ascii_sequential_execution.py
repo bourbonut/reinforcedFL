@@ -205,6 +205,8 @@ for iexp in range(NEXPS):
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
         start = perf_counter()
         indices_participants = scheduler.select_next_partipants(state)
+        #print(f"{indices_participants = }")
+        participants = [workers[i] for i in indices_participants]
         for worker in participants:
             worker.communicatewith(server)
 
@@ -221,6 +223,7 @@ for iexp in range(NEXPS):
                 state.extend(worker.compute_times())
             else:
                 state.extend([0., 0., 0.])
+        #print(f"{state = }")
         server.update(indices_participants)
 
         for worker in workers:
@@ -230,13 +233,14 @@ for iexp in range(NEXPS):
         te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
         duration = perf_counter() - start
 
+        max_time = max((sum(time) for time in scheduler.grouped(state)))
         table.add_row(
-            str(r + 1),
+            str(1),
             f"{tr_avg_acc:.2%}",
             f"{te_avg_acc:.2%}",
             f"{duration:.3f} s",
             f"{0}",
-            f"{sum(state):.3f s}",
+            f"{max_time:.3f} s",
         )
         live.refresh()
         global_accs.append((tr_avg_acc, te_avg_acc))
@@ -246,6 +250,7 @@ for iexp in range(NEXPS):
             # Selection of future participants
             indices_participants = scheduler.select_next_partipants(state)
             # indices_participants = random.sample(list(range(len(workers))), len(workers) // 10)
+            #print(f"{indices_participants = }")
             participants = [workers[i] for i in indices_participants]
 
             # Workers download the global model
@@ -287,6 +292,7 @@ for iexp in range(NEXPS):
             # server.collects_global_accuracies(singular_accuracies, indices_participants)
             duration = perf_counter() - start
 
+            max_time = max((sum(time) for time in scheduler.grouped(state)))
             # Update the table
             table.add_row(
                 str(r + 1),
@@ -294,7 +300,7 @@ for iexp in range(NEXPS):
                 f"{te_avg_acc:.2%}",
                 f"{duration:.3f} s",
                 f"{scheduler.loss}",
-                f"{sum(state):.3f s}",
+                f"{max_time:.3f} s",
             )
             live.refresh()
 
