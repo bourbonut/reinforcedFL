@@ -14,7 +14,7 @@ def grouped(list_, k):
 class Scheduler:
     def __init__(self, ninput, noutput, device, path, **kwargs):
         self.agent = Policy(ninput, noutput, device).to(device)
-        self.optimizer = torch.optim.Adam(self.agent.parameters(), lr=3e-2)
+        self.optimizer = torch.optim.Adam(self.agent.parameters(), lr=5e-3)
         self.device = device
         self.speed = log(1e-6) / log(1 - 0.95)
         self.gamma = 0.99
@@ -31,13 +31,13 @@ class Scheduler:
     def discount_reward(self):
         R = 0
         # returns = []
-        for r in self.rewards[::-1]:
-            R = r + self.gamma * R
+        # for r in self.rewards[::-1]:
+            # R = r + self.gamma * R
             # returns.insert(0, R)
         # returns = torch.tensor(returns)
         # returns = (returns - returns.mean()) / (returns.std() + 1e-6)
         # return returns[0]
-        return R
+        return self.rewards[-1]
 
     def select_next_partipants(self, state):
         if state == []:
@@ -47,12 +47,13 @@ class Scheduler:
         state = state / torch.norm(state, dim=0)
         state = state.flatten()
         actor_probas, self.critic_value = self.agent(state)
-        #print(f"{actor_probas = }")
-        #print(f"{self.critic_value = }")
+        print(f"{actor_probas = }")
+        print(f"{self.critic_value = }")
         m = Bernoulli(actor_probas)
         self.action = m.sample()
         self.log_prob = m.log_prob(self.action)
         action = self.action.type(torch.int).tolist()
+        print(f"{action = }")
         return [i for i in range(len(action)) if action[i]]
     
     def grouped(self, list_):
