@@ -13,21 +13,19 @@ import random, pickle
 
 class Scheduler:
     def __init__(self, ninput, noutput, device, path, k=1, **kwargs):
-        self.agent = ActorCritic(ninput * k, noutput, device, la=1e-3, lc=1e-2).to(device)
-        self.optimizer = torch.optim.Adam(self.agent.parameters(), lr=5e-3)
+        self.agent = ActorCritic(ninput * k, noutput, device, la=1e-3, lc=1e-2)
         self.device = device
         self.rewards = []
         self.action_dim = noutput
         self.action = None
         self.path = path
         self.i = 0
-        self.loss = 0
         self.k = k
 
-    def normalize(self, state):
+    def normalize(self, state, flatten=True):
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
         state = state / torch.norm(state, dim=0)
-        return state.flatten()
+        return state.flatten() if flatten else state
 
     def select_next_partipants(self, state):
         if state == []:
@@ -35,7 +33,7 @@ class Scheduler:
             k = self.action_dim // 10
             sample = random.sample(population, k)
             return [int(i in sample) for i in range(self.action_dim)]
-        return self.agent.get_action(state)
+        return self.agent.get_action(self.normalize(state))
 
     def grouped(self, list_):
         k = self.k
@@ -44,7 +42,7 @@ class Scheduler:
 
     def compute_reward(self, action, new_state):
         action = torch.tensor(action)
-        normalized_state = self.normalize(new_state)
+        normalized_state = self.normalize(new_state, False)
         reward = torch.max(normalized_state.sum(1) * action).item()
         self.rewards.append(reward)
         return reward
@@ -61,4 +59,4 @@ class Scheduler:
         self.rewards.clear()
         self.action = None
         self.i += 1
-        self.loss = 0
+        self.agent.losses.clear()

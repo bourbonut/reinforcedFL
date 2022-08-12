@@ -206,7 +206,7 @@ for iexp in range(NEXPS):
     align = Align.center(table)
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
         start = perf_counter()
-        indices_participants = scheduler.select_next_partipants(state)
+        selection = scheduler.select_next_partipants(state)
         indices_participants = [i for i in range(len(workers)) if selection[i]]
         # print(f"{indices_participants = }")
         participants = [workers[i] for i in indices_participants]
@@ -251,6 +251,8 @@ for iexp in range(NEXPS):
             start = perf_counter()
 
             # Selection of future participants
+            #print(f"{state = }")
+            #print(f"{len(state) = }")
             selection = scheduler.select_next_partipants(state)
             indices_participants = [i for i in range(len(workers)) if selection[i]]
             # indices_participants = random.sample(list(range(len(workers))), len(workers) // 10)
@@ -281,9 +283,9 @@ for iexp in range(NEXPS):
                 else:
                     new_state.extend(state[3 * i: 3 * (i + 1)])
 
-            server.update()
-            scheduler.compute_reward(action, new_state)
-            scheduler.update(state, selection, new_state)
+            server.update(indices_participants)
+            reward = scheduler.compute_reward(selection, new_state)
+            scheduler.update(state, selection, reward, new_state)
 
             for worker in workers:
                 worker.communicatewith(server)
@@ -304,7 +306,7 @@ for iexp in range(NEXPS):
                 f"{tr_avg_acc:.2%}",
                 f"{te_avg_acc:.2%}",
                 f"{duration:.3f} s",
-                f"{scheduler.loss}",
+                f"{scheduler.agent.losses}",
                 f"{max_time:.3f} s",
             )
             live.refresh()

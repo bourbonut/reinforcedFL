@@ -19,6 +19,7 @@ class Actor(nn.Module):
 
     def forward(self, x):
         x = x.to(self.device)
+        x = torch.tanh(self.input(x))
         x = torch.tanh(self.hidden1(x))
         x = torch.tanh(self.hidden2(x))
         return (torch.tanh(self.output(x)) + 1) * 0.5
@@ -37,6 +38,7 @@ class Critic(nn.Module):
 
     def forward(self, x):
         x = x.to(self.device)
+        x = torch.tanh(self.input(x))
         x = torch.tanh(self.hidden1(x))
         x = torch.tanh(self.hidden2(x))
         return self.output(x)
@@ -46,17 +48,20 @@ class ActorCritic:
     def __init__(self, ninput, noutput, device, la=1e-3, lc=1e-2):
         self.device = device
         self.gamma = 0.99
-        self.actor = Actor(ninput, noutput, device)
-        self.critic = Critic(ninput, device)
+        self.actor = Actor(ninput, noutput, device).to(device)
+        self.critic = Critic(ninput, device).to(device)
 
         self.a_optim = Adam(self.actor.parameters(), lr=la)
         self.c_optim = Adam(self.critic.parameters(), lr=lc)
+        self.losses = [0, 0]
 
     def train_actor(self, state, action, td_error):
         probas = self.actor(state)
-        action = torch.tensor(action, dtype=torch.int)
-        logprob = torch.gather(torch.log(probas), 1, action)
-        loss = -logprob * td_error
+        action = torch.bernoulli(probas)
+        logprob = torch.log(probas) * action
+        #logprob = torch.gather(torch.log(probas), 1, action.T)
+        loss = -logprob.sum() * td_error
+        self.losses[1] = loss.item()
 
         self.a_optim.zero_grad()
         loss.backward()
@@ -67,11 +72,12 @@ class ActorCritic:
         v = self.critic(state)
         td_error = reward + self.gamma * v_ - v
         loss = torch.square(td_error)
+        self.losses[0] = loss.item()
 
         self.c_optim.zero_grad()
         loss.backward()
         self.c_optim.step()
-        return td_error
+        return td_error.detach()
 
     def get_action(self, state):
         return torch.bernoulli(self.actor(state)).type(torch.int).tolist()
