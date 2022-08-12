@@ -14,6 +14,7 @@ from rich.panel import Panel
 from pathlib import Path
 from time import perf_counter
 import random
+from copy import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument(dest="environment", help="environment path")
@@ -148,10 +149,9 @@ with Live(panel, auto_refresh=False) as live:
     # Initialization of the scheduler (participation agent)
     texts.append(Align.center("[cyan]Initialization of the scheduler[/]"))
     scheduler = Scheduler(
-        parameters["model"]["ninput"] * 3,
-        parameters["model"]["noutput"],
-        device,
-        exp_path / "scheduler",
+        **parameters["model"],
+        device=device,
+        path=exp_path / "scheduler",
     )
     texts[-1] = Align.center("[green]The scheduler is successfully initialized.[/]")
     panel.renderable = Group(*texts)
@@ -186,6 +186,8 @@ create(exp_path / "scheduler", verbose=False)
 # second list for testing
 global_accs = []
 state = []
+new_state = []
+history = [[0.0, 0.0, 0.0] for _ in range(NWORKERS)]
 
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))
@@ -205,7 +207,8 @@ for iexp in range(NEXPS):
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
         start = perf_counter()
         indices_participants = scheduler.select_next_partipants(state)
-        #print(f"{indices_participants = }")
+        indices_participants = [i for i in range(len(workers)) if selection[i]]
+        # print(f"{indices_participants = }")
         participants = [workers[i] for i in indices_participants]
         for worker in participants:
             worker.communicatewith(server)
@@ -222,8 +225,8 @@ for iexp in range(NEXPS):
             if i in indices_participants:
                 state.extend(worker.compute_times())
             else:
-                state.extend([0., 0., 0.])
-        #print(f"{state = }")
+                state.extend([0.0, 0.0, 0.0])
+        # print(f"{state = }")
         server.update(indices_participants)
 
         for worker in workers:
@@ -248,9 +251,10 @@ for iexp in range(NEXPS):
             start = perf_counter()
 
             # Selection of future participants
-            indices_participants = scheduler.select_next_partipants(state)
+            selection = scheduler.select_next_partipants(state)
+            indices_participants = [i for i in range(len(workers)) if selection[i]]
             # indices_participants = random.sample(list(range(len(workers))), len(workers) // 10)
-            #print(f"{indices_participants = }")
+            # print(f"{indices_participants = }")
             participants = [workers[i] for i in indices_participants]
 
             # Workers download the global model
@@ -270,16 +274,16 @@ for iexp in range(NEXPS):
             # Server downloads all local updates
             for worker in participants:
                 server.communicatewith(worker)
-            state.clear()
+            new_state.clear()
             for i, worker in enumerate(workers):
                 if i in indices_participants:
-                    state.extend(worker.compute_times())
+                    new_state.extend(worker.compute_times())
                 else:
-                    state.extend([0., 0., 0.])
+                    new_state.extend(state[3 * i: 3 * (i + 1)])
 
-            server.update(indices_participants)
-            scheduler.compute_reward(state)
-            scheduler.update()
+            server.update()
+            scheduler.compute_reward(action, new_state)
+            scheduler.update(state, selection, new_state)
 
             for worker in workers:
                 worker.communicatewith(server)
@@ -292,7 +296,8 @@ for iexp in range(NEXPS):
             # server.collects_global_accuracies(singular_accuracies, indices_participants)
             duration = perf_counter() - start
 
-            max_time = max((sum(time) for time in scheduler.grouped(state)))
+            max_time = max((sum(time) for time in scheduler.grouped(new_state)))
+            state = copy(new_state)
             # Update the table
             table.add_row(
                 str(r + 1),
