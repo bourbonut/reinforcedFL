@@ -187,7 +187,6 @@ create(exp_path / "scheduler", verbose=False)
 global_accs = []
 state = []
 new_state = []
-history = [[0.0, 0.0, 0.0] for _ in range(NWORKERS)]
 
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))
