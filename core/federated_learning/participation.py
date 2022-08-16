@@ -1,6 +1,7 @@
 from core.scheduler.model import ActorCritic
 from math import log
 from copy import copy
+from itertools import compress
 import random, pickle, torch
 
 class BaseScheduler:
@@ -36,6 +37,9 @@ class BaseScheduler:
                 self.new_state.extend(worker.compute_times())
             else:
                 self.new_state.extend(self.state[3 * i : 3 * (i + 1)])
+    
+    def max_time(self, selection, new=True):
+        return max(compress(map(sum, self.grouped(new)), selection))
 
     def copy_state(self):
         self.state = copy(self.new_state)
@@ -95,7 +99,10 @@ class Scheduler(BaseScheduler):
         self.rewards.clear()
         self.action = None
         self.i += 1
-        self.agent.losses.clear()
+        self.agent.losses[0] = 0
+        self.agent.losses[1] = 0
+        self.state.clear()
+        self.new_state.clear()
 
 
 class RandomScheduler(BaseScheduler):
@@ -112,3 +119,10 @@ class RandomScheduler(BaseScheduler):
         selection = [int(i in sample) for i in range(self.size)]
         indices = [i for i in range(len(self.size)) if selection[i]]
         return selection, indices
+
+class FullScheduler(BaseScheduler):
+    def __init__(self, size, ratio=1):
+        super().__init__(size, ratio)
+
+    def select_next_partipants(self):
+        return [1] * self.size, list(range(self.size))
