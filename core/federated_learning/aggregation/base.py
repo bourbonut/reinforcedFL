@@ -148,6 +148,7 @@ class EvaluatorServer(BaseServer):
         self.losses = []
         self.batch_loss = []
         self.selections = []  # selections over time for analysis
+        self.curr_selection = []
 
     def collects_training_accuracies(self, accuracies):
         """
@@ -185,16 +186,14 @@ class EvaluatorServer(BaseServer):
         probas = self.agent.forward(state)
         p = 0  # number of participants
         minp = self.nworkers // 10
+        action = torch.tensor([])
         with torch.no_grad():
             while p <= minp:
                 action = torch.bernoulli(probas)
-                selection = action[:, 0].tolist()
-                p = sum(selection)
-        self.selections.append(selection)
-        participants = compress(self.participants_updates, selection)
-
-        # Update batch array
-        self.update_batch(state.tolist(), action.T)
+                self.curr_selection = action[:, 0].tolist()
+                p = sum(self.curr_selection)
+        self.selections.append(self.curr_selection)
+        participants = compress(self.participants_updates, self.curr_selection)
 
         # Update the global model
         new_weights = map(lambda layer: sum(layer) / p, zip(*participants))
@@ -202,6 +201,7 @@ class EvaluatorServer(BaseServer):
             target_param.data.copy_(param.data)
         self.participants_updates.clear()
         self.global_accuracies.clear()
+        return action
 
     def train_agent(self):
         """
@@ -233,6 +233,7 @@ class EvaluatorServer(BaseServer):
         self.accuracies.clear()
         self.global_accuracies.clear()
         self.batch_loss.clear()
+        self.curr_selection.clear()
         self.delta = 0
         if filename is not None:
             attrbs = {"title": "Evolution of loss function"}

@@ -1,4 +1,4 @@
-from core.federated_learning.base import BaseServer, EvaluatorServer
+from core.federated_learning.aggregation.base import BaseServer
 from rich.table import Table
 from rich.align import Align
 from rich.live import Live
