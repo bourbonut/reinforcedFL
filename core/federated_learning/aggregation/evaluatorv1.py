@@ -6,6 +6,7 @@ from time import perf_counter
 from itertools import compress
 import torch, pickle
 
+
 class EvaluatorV1(EvaluatorServer):
     """
     Class based on `EvaluatorServer`
@@ -39,7 +40,7 @@ class EvaluatorV1(EvaluatorServer):
     def compute_glb_acc(self, workers_accuracies, train=False):
         indices = range(len(workers_accuracies))
         return super().compute_glb_acc(workers_accuracies, indices, train)
-    
+
     def update_batch(self, state, action):
         """
         Update MovingBatch class
@@ -54,7 +55,7 @@ class EvaluatorV1(EvaluatorServer):
         curr_accuracy = sum(compress(self.accuracies, self.curr_selection)) / p
         reward = curr_accuracy - self.delta
         self.rewards.append(reward)
-        self.tracking_rewards.append(reward) 
+        self.tracking_rewards.append(reward)
 
         # Update batch array
         self.update_batch(self.accuracies, action.T)
@@ -66,6 +67,8 @@ class EvaluatorV1(EvaluatorServer):
     def execute(
         self, nexp, rounds, workers, train, evaluate, path, model, *args, **kwargs
     ):
+        # Global accuracies : first list for training
+        # second list for testing
         global_accs = []
         # Main loop
         for iexp in range(nexp):
@@ -91,11 +94,6 @@ class EvaluatorV1(EvaluatorServer):
                     tr_avg_acc = self.compute_glb_acc(accuracies)
 
                     # Training loop of workers
-
-                    # # No save of loss evolution
-                    # curr_path = exp_path / f"round{r}" / f"epoch{e}"
-                    # create(curr_path, verbose=False)
-                    # train(workers, curr_path)
                     train(workers)
 
                     # Workers evaluate accuracy of global model

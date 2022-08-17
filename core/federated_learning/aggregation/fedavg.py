@@ -38,16 +38,18 @@ class FederatedAveraging(BaseServer):
         self,
         nexp,
         rounds,
-        scheduler,
         workers,
         train,
         evaluate,
         path,
         model,
+        scheduler,
         k=10,
         *args,
         **kwargs,
     ):
+        # Global accuracies : first list for training
+        # second list for testing
         global_accs = []
         for iexp in range(nexp):
             table = Table(

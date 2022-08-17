@@ -182,152 +182,19 @@ with Live(panel, auto_refresh=False) as live:
 create(exp_path / "agent", verbose=False)
 create(exp_path / "scheduler", verbose=False)
 
-# Global accuracies : first list for training
-# second list for testing
-global_accs = []
-state = []
-new_state = []
-
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))
 # Main loop
-for iexp in range(NEXPS):
-    table = Table(
-        "Round",
-        "Training accuracies [%]",
-        "Testing accuracies [%]",
-        "Duration \[s]",
-        "Losses",
-        "Time (computation & communication) \[s]",
-        title=f"Experiment {iexp}",
-    )
-
-    align = Align.center(table)
-    with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
-        start = perf_counter()
-        selection = scheduler.select_next_partipants(state)
-        indices_participants = [i for i in range(len(workers)) if selection[i]]
-        # print(f"{indices_participants = }")
-        participants = [workers[i] for i in indices_participants]
-        for worker in participants:
-            worker.communicatewith(server)
-
-        train(participants)
-        pair = evaluate(participants, True, full=True)
-        accuracies, singular_accuracies = zip(*pair)
-        tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
-
-        for worker in participants:
-            server.communicatewith(worker)
-        state.clear()
-        for i, worker in enumerate(workers):
-            if i in indices_participants:
-                state.extend(worker.compute_times())
-            else:
-                state.extend([0.0, 0.0, 0.0])
-        # print(f"{state = }")
-        server.update(indices_participants)
-
-        for worker in workers:
-            worker.communicatewith(server)
-        pair = evaluate(workers, full=True)
-        accuracies, singular_accuracies = zip(*pair)
-        te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
-        duration = perf_counter() - start
-
-        max_time = max((sum(time) for time in scheduler.grouped(state)))
-        table.add_row(
-            str(1),
-            f"{tr_avg_acc:.2%}",
-            f"{te_avg_acc:.2%}",
-            f"{duration:.3f} s",
-            f"{0}",
-            f"{max_time:.3f} s",
-        )
-        live.refresh()
-        global_accs.append((tr_avg_acc, te_avg_acc))
-        for r in range(1, ROUNDS):
-            start = perf_counter()
-
-            # Selection of future participants
-            #print(f"{state = }")
-            #print(f"{len(state) = }")
-            selection = scheduler.select_next_partipants(state)
-            indices_participants = [i for i in range(len(workers)) if selection[i]]
-            # indices_participants = random.sample(list(range(len(workers))), len(workers) // 10)
-            # print(f"{indices_participants = }")
-            participants = [workers[i] for i in indices_participants]
-
-            # Workers download the global model
-            for worker in participants:
-                worker.communicatewith(server)
-
-            # Training loop of workers
-            train(participants)
-
-            # Workers evaluate accuracy of global model
-            # on their local training data
-            pair = evaluate(participants, True, full=True)
-            accuracies, singular_accuracies = zip(*pair)
-            tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
-            # server.collects_training_accuracies(singular_accuracies)
-
-            # Server downloads all local updates
-            for worker in participants:
-                server.communicatewith(worker)
-            new_state.clear()
-            for i, worker in enumerate(workers):
-                if i in indices_participants:
-                    new_state.extend(worker.compute_times())
-                else:
-                    new_state.extend(state[3 * i: 3 * (i + 1)])
-
-            server.update(indices_participants)
-            reward = scheduler.compute_reward(selection, new_state)
-            scheduler.update(state, selection, reward, new_state)
-
-            for worker in workers:
-                worker.communicatewith(server)
-
-            # Workers evaluate accuracy of the global model
-            # on their local testing data
-            pair = evaluate(workers, full=True)
-            accuracies, singular_accuracies = zip(*pair)
-            te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
-            # server.collects_global_accuracies(singular_accuracies, indices_participants)
-            duration = perf_counter() - start
-
-            max_time = max((sum(time) for time in scheduler.grouped(new_state)))
-            state = copy(new_state)
-            # Update the table
-            table.add_row(
-                str(r + 1),
-                f"{tr_avg_acc:.2%}",
-                f"{te_avg_acc:.2%}",
-                f"{duration:.3f} s",
-                f"{scheduler.agent.losses}",
-                f"{max_time:.3f} s",
-            )
-            live.refresh()
-
-            # Update global_accs
-            global_accs.append((tr_avg_acc, te_avg_acc))
-
-    # Reset the server
-    server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
-    server.global_model = Model(nclasses, device).to(device)
-    scheduler.reset()
-    state.clear()
-
-    # Reset workers
-    for worker in workers:
-        worker.model = Model(nclasses, device).to(device)
-
-    # Save results
-    with open(exp_path / f"global_accs-{iexp}.pkl", "wb") as file:
-        pickle.dump(global_accs, file)
-
-    global_accs.clear()
+server.execute(
+    NEXPS,
+    ROUNDS,
+    workers,
+    train,
+    evaluate,
+    exp_path,
+    lambda: Model(nclasses, device).to(device),
+    scheduler,
+)
 
 server.finish(exp_path / "agent")
 console.print("Finished.")
