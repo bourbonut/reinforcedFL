@@ -59,7 +59,6 @@ class ActorCritic:
         probas = self.actor(state)
         action = torch.bernoulli(probas)
         logprob = torch.log(probas) * action
-        #logprob = torch.gather(torch.log(probas), 1, action.T)
         loss = -logprob.sum() * td_error
         self.losses[1] = loss.item()
 
@@ -80,7 +79,10 @@ class ActorCritic:
         return td_error.detach()
 
     def get_action(self, state):
-        return torch.bernoulli(self.actor(state)).type(torch.int).tolist()
+        # print(state.size())
+        probas = self.actor(state)
+        #print(probas)
+        return torch.bernoulli(probas).type(torch.int).tolist()
 
 
 # class Policy(nn.Module):

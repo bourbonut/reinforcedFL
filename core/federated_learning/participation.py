@@ -24,7 +24,10 @@ class Scheduler:
 
     def normalize(self, state, flatten=True):
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
-        state = state / torch.norm(state, dim=0)
+        mean = torch.cat([state.mean(1).unsqueeze(0)] * state.size(1)).T
+        std = torch.cat([state.std(1).unsqueeze(0)] * state.size(1)).T
+        state = (state - mean) / std
+        #state = state / torch.norm(state, dim=0)
         return state.flatten() if flatten else state
 
     def select_next_partipants(self, state):
@@ -59,4 +62,5 @@ class Scheduler:
         self.rewards.clear()
         self.action = None
         self.i += 1
-        self.agent.losses.clear()
+        self.agent.losses[0] = 0
+        self.agent.losses[1] = 0

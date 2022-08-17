@@ -15,6 +15,7 @@ from pathlib import Path
 from time import perf_counter
 import random
 from copy import copy
+import statistics
 
 parser = argparse.ArgumentParser()
 parser.add_argument(dest="environment", help="environment path")
@@ -226,6 +227,8 @@ for iexp in range(NEXPS):
                 state.extend(worker.compute_times())
             else:
                 state.extend([0.0, 0.0, 0.0])
+        means = [statistics.mean(filter(lambda x: x!=0., state[i::3])) for i in range(3)]
+        state = [means[i%3] if s==0. else s for i, s in enumerate(state)]
         # print(f"{state = }")
         server.update(indices_participants)
 
@@ -236,7 +239,7 @@ for iexp in range(NEXPS):
         te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
         duration = perf_counter() - start
 
-        max_time = max((sum(time) for time in scheduler.grouped(state)))
+        max_time = max((sel * sum(time) for sel, time in zip(selection, scheduler.grouped(state))))
         table.add_row(
             str(1),
             f"{tr_avg_acc:.2%}",
@@ -298,7 +301,9 @@ for iexp in range(NEXPS):
             # server.collects_global_accuracies(singular_accuracies, indices_participants)
             duration = perf_counter() - start
 
-            max_time = max((sum(time) for time in scheduler.grouped(new_state)))
+            #print(f"{list(scheduler.grouped(new_state)) = }")
+            #max_time = max((sum(time) for time in scheduler.grouped(new_state)))
+            max_time = max((sel * sum(time) for sel, time in zip(selection, scheduler.grouped(new_state))))
             state = copy(new_state)
             # Update the table
             table.add_row(
