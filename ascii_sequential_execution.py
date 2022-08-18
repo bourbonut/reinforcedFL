@@ -190,6 +190,9 @@ state = []
 new_state = []
 history = [[0.0, 0.0, 0.0] for _ in range(NWORKERS)]
 
+#alltimes = [sum(worker.compute_times()) for worker in workers]
+#ten_best = sorted(alltimes)[-int(len(workers) * 0.1):]
+
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))
 # Main loop
