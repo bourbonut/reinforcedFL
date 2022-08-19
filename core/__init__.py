@@ -5,7 +5,7 @@ Module which deals with :
 - Main functions for training and evaluation
 """
 
-from .federated_learning.aggregation import FederatedAveraging, EvaluatorServer
+from .federated_learning.aggregation import FederatedAveraging
 from .federated_learning.participation import Scheduler
 from .federated_learning.worker import Worker
 

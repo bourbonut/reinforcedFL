@@ -2,7 +2,7 @@ from utils import *
 from core import *
 import model4FL
 import pickle, torch, json
-from core.federated_learning import aggregation, worker
+from core.federated_learning import aggregation, worker, participation
 import argparse
 from rich import print as rich_print
 from rich.markdown import Markdown
@@ -54,7 +54,10 @@ ROUNDS = parameters["environment"]["rounds"]
 NWORKERS = parameters["environment"]["nworkers"]
 EPOCHS = parameters["environment"]["epochs"]
 server_class = getattr(aggregation, parameters["model"]["server_class"])
+scheduler_class = getattr(participation, parameters["model"].get("scheduler_class", "FullScheduler"))
 worker_class = getattr(worker, parameters["model"]["worker_class"])
+
+parameters["model"]["size"] = NWORKERS
 
 ON_GPU = args.gpu
 REFRESH = args.refresh
@@ -148,7 +151,7 @@ with Live(panel, auto_refresh=False) as live:
 
     # Initialization of the scheduler (participation agent)
     texts.append(Align.center("[cyan]Initialization of the scheduler[/]"))
-    scheduler = Scheduler(
+    scheduler = scheduler_class(
         **parameters["model"],
         device=device,
         path=exp_path / "scheduler",

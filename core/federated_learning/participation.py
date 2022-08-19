@@ -10,6 +10,7 @@ class BaseScheduler:
         self.state = []
         self.new_state = []
         self.k = ratio
+        self.loss = "No loss"
 
     def normalize(self, state, flatten=True):
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
@@ -56,15 +57,16 @@ class Scheduler(BaseScheduler):
     K = 3
     PORTION = 10
 
-    def __init__(self, ninput, noutput, device, path, **kwargs):
-        super(Scheduler, self).__init__(noutput, self.K)
-        self.agent = ActorCritic(ninput * self.K, noutput, device, la=1e-3, lc=1e-2)
+    def __init__(self, size, device, path, **kwargs):
+        super(Scheduler, self).__init__(size, self.K)
+        self.agent = ActorCritic(size * self.K, size, device, la=1e-3, lc=1e-2)
         self.device = device
         self.rewards = []
         self.path = path
         self.i = 0
         self.state = []
         self.new_state = []
+        self.loss = 0
 
     def select_next_partipants(self):
         if self.state == []:
@@ -92,6 +94,7 @@ class Scheduler(BaseScheduler):
             normalized_state, reward, normalized_new_state
         )
         self.agent.train_actor(normalized_state, action, td_error)
+        self.loss = self.agent.losses
 
     def reset(self):
         with open(self.path / f"rewards-{self.i}.pkl", "wb") as file:
@@ -107,21 +110,21 @@ class Scheduler(BaseScheduler):
 
 class RandomScheduler(BaseScheduler):
 
-    PORTION = 10
+    PORTION = 0.1
 
-    def __init__(self, size):
+    def __init__(self, size, *args, **kwargs):
         super(RandomScheduler, self).__init__(size)
 
     def select_next_partipants(self):
         population = list(range(self.size))
-        k = self.size // self.PORTION
+        k = int(self.size * self.PORTION)
         sample = random.sample(population, k)
         selection = [int(i in sample) for i in range(self.size)]
-        indices = [i for i in range(len(self.size)) if selection[i]]
+        indices = [i for i in range(self.size) if selection[i]]
         return selection, indices
 
 class FullScheduler(BaseScheduler):
-    def __init__(self, size, ratio=1):
+    def __init__(self, size, ratio=1, *args, **kwargs):
         super().__init__(size, ratio)
 
     def select_next_partipants(self):

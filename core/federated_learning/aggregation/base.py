@@ -100,6 +100,12 @@ class BaseServer:
         """
         return sum(workers_accuracies) / self.local_size(indices, train)
 
+    def reset(self, *args, **kwargs):
+        pass
+
+    def finish(self, *args, **kwargs):
+        pass
+
 
 class EvaluatorServer(BaseServer):
     """
