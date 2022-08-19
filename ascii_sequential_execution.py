@@ -190,8 +190,14 @@ state = []
 new_state = []
 history = [[0.0, 0.0, 0.0] for _ in range(NWORKERS)]
 
-#alltimes = [sum(worker.compute_times()) for worker in workers]
-#ten_best = sorted(alltimes)[-int(len(workers) * 0.1):]
+alltimes = [sum(worker.compute_times()) for worker in workers]
+ten_best = sorted(alltimes)[:int(len(workers) * 0.1)]
+best_indices = set([alltimes.index(i) for i in ten_best])
+print(sorted(alltimes))
+print(alltimes)
+print(best_indices)
+
+break_now = False
 
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))
@@ -204,8 +210,10 @@ for iexp in range(NEXPS):
         "Duration \[s]",
         "Losses",
         "Time (computation & communication) \[s]",
+        "Quality (ratio & size & tested)",
         title=f"Experiment {iexp}",
     )
+    already_selected = set()
 
     align = Align.center(table)
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
@@ -248,8 +256,9 @@ for iexp in range(NEXPS):
             f"{tr_avg_acc:.2%}",
             f"{te_avg_acc:.2%}",
             f"{duration:.3f} s",
-            f"{0}",
+            "Random round",
             f"{max_time:.3f} s",
+            "Random round",
         )
         live.refresh()
         global_accs.append((tr_avg_acc, te_avg_acc))
@@ -261,9 +270,13 @@ for iexp in range(NEXPS):
             #print(f"{len(state) = }")
             selection = scheduler.select_next_partipants(state)
             indices_participants = [i for i in range(len(workers)) if selection[i]]
+            already_selected.update(set(indices_participants))
             # indices_participants = random.sample(list(range(len(workers))), len(workers) // 10)
             # print(f"{indices_participants = }")
             participants = [workers[i] for i in indices_participants]
+            if len(participants) == 0:
+                break_now = True
+                break
 
             # Workers download the global model
             for worker in participants:
@@ -308,6 +321,7 @@ for iexp in range(NEXPS):
             #max_time = max((sum(time) for time in scheduler.grouped(new_state)))
             max_time = max((sel * sum(time) for sel, time in zip(selection, scheduler.grouped(new_state))))
             state = copy(new_state)
+            ratio = len(best_indices.intersection(indices_participants)) / len(best_indices)
             # Update the table
             table.add_row(
                 str(r + 1),
@@ -316,11 +330,15 @@ for iexp in range(NEXPS):
                 f"{duration:.3f} s",
                 f"{scheduler.agent.losses}",
                 f"{max_time:.3f} s",
+                f"{(ratio, len(indices_participants), len(already_selected))}",
             )
             live.refresh()
 
             # Update global_accs
             global_accs.append((tr_avg_acc, te_avg_acc))
+
+    if break_now:
+        break
 
     # Reset the server
     server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
@@ -339,4 +357,5 @@ for iexp in range(NEXPS):
     global_accs.clear()
 
 server.finish(exp_path / "agent")
+scheduler.finish()
 console.print("Finished.")
