@@ -12,9 +12,6 @@ from rich.align import Align
 from rich.live import Live
 from rich.panel import Panel
 from pathlib import Path
-from time import perf_counter
-import random
-from copy import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument(dest="environment", help="environment path")

@@ -9,7 +9,17 @@ import torch, pickle
 
 class EvaluatorV2(EvaluatorServer):
     """
-    Class based on `EvaluatorServer`
+    This class is based on the `REINFORCE` algorithm class from
+    the evaluator module (`core.evaluator`) for a better aggregation
+    (inspired by the algorithm `FRCCE` - `arXiv:2102.13314v1`)
+
+    The state is defined as the accuracies of workers after local
+    training less the accuracies of the global model before aggregation
+    
+    The reward is defined with two different ways
+    - with an exponential moving average
+    - with an exponential function
+    (see the code for more information)
     """
 
     TARGET = 0.99
@@ -19,8 +29,7 @@ class EvaluatorV2(EvaluatorServer):
         global_model,
         size_traindata,
         size_testdata,
-        ninput=None,
-        noutput=None,
+        size=None,
         capacity=3,
         gamma=0.99,
         optimizer=None,
@@ -28,23 +37,42 @@ class EvaluatorV2(EvaluatorServer):
         *args,
         **kwargs,
     ):
+        """
+        Initialize the class
+
+        Parameters:
+
+            global_model (nn.Module):   the global model
+            size_traindata (list):      the list of sizes of local data for training
+                                        (supposed gotten by Federated Analytic)
+            size_testdata (list):       the list of sizes of local data for testing
+                                        (supposed gotten by Federated Analytic)
+            size (int):                 the number of workers
+            capacity (int):             the capacity of the moving batch size
+            gamma (float):              the discount factor used for reward
+            optimizer (Optimizer):      the optimizer for the agent
+            delta_method (bool):        for choosing the method used to compute the reward
+        """
         super(EvaluatorV2, self).__init__(
             global_model,
             size_traindata,
             size_testdata,
-            ninput,
-            noutput,
+            size,
+            size,
             capacity,
             gamma,
             optimizer,
         )
         if delta_method:
-            self.delta = 0
+            self.delta = 0 # Window for moving average
         else:
-            self.speed = log(1e-6) / log(1 - 0.95)
+            self.speed = log(1e-6) / log(1 - 0.95) # exponent for reward
         self.delta_method = delta_method
 
     def compute_glb_acc(self, workers_accuracies, train=False):
+        """
+        Compute the global accuracy based on the Federated Averaging algorithm
+        """
         indices = range(len(workers_accuracies))
         return super().compute_glb_acc(workers_accuracies, indices, train)
 
@@ -63,6 +91,9 @@ class EvaluatorV2(EvaluatorServer):
             self.delta = self.compute_glb_acc(accuracies)
 
     def train_agent(self, accuracies):
+        """
+        Train the agent
+        """
         curr_accuracy = self.compute_glb_acc(accuracies)
         if self.delta_method:
             reward = curr_accuracy - self.delta
@@ -79,6 +110,14 @@ class EvaluatorV2(EvaluatorServer):
         self.accuracies.clear()
 
         return super().train_agent()
+
+    def reset(self, filename=None):
+        """
+        Reset work values for next round
+        """
+        if self.delta_method:
+            self.delta = 0
+        return super().reset(filename)
 
     def execute(
         self, nexp, rounds, workers, train, evaluate, path, model, *args, **kwargs

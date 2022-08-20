@@ -1,6 +1,9 @@
 """
 Set of main classes for Federated Learning :
-- `Node` represents a worker with a local model and local dataset
-- `EvaluatorServer` plays the role of the server and relies on the `FRCCE` algorithm (see docstring)
-- `FederatedAveraging` is also a server class which is based of `FedAvg` (see docstring)
+- the worker in `core/federated_learning/worker.py` which represents a
+device with local data and a local model
+- the aggregation in `core/federated_learning/aggregation` which is a
+directory with different algorithms to aggregate all local models
+- the scheduler in `core/federated_learning/participation.py` where
+there are different classes for selecting the next participants
 """

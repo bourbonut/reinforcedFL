@@ -1,14 +1,11 @@
-import torch
 from torch import nn
 from torch.nn import functional as F
 from torch import optim
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 class Model(nn.Module):
     """
-    Neural network for MNIST dataset
+    Neural network for FashionMNIST dataset
     """
 
     def __init__(self, nclasses, device):

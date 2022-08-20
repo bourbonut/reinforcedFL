@@ -67,6 +67,17 @@ class BaseServer:
     """
 
     def __init__(self, global_model, size_traindata, size_testdata):
+        """
+        Initialize the class
+
+        Parameters:
+
+            global_model (nn.Module):   the global model
+            size_traindata (list):      the list of sizes of local data for training
+                                        (supposed gotten by Federated Analytic)
+            size_testdata (list):       the list of sizes of local data for testing
+                                        (supposed gotten by Federated Analytic)
+        """
         self.global_model = global_model
         self.participants_updates = []
         self.n = size_traindata  # list
@@ -88,9 +99,12 @@ class BaseServer:
         """
         For convenience, this method is used for communication.
         """
-        self.receive(worker.send())
+        self.receive(worker.send(False))
 
     def local_size(self, indices, train=True):
+        """
+        Return the sum of sizes depending of the indices of participants
+        """
         sizes = self.n if train else self.t
         return sum((sizes[i] for i in indices))
 
@@ -109,9 +123,10 @@ class BaseServer:
 
 class EvaluatorServer(BaseServer):
     """
-    This class is based on the `REINFORCE` algorithm class from
-    the evaluator module (`core.evaluator`) for a better aggregation
-    (inspired by the algorithm `FRCCE` - `arXiv:2102.13314v1`)
+    This class is a base class for `EvaluatorV1` and
+    `EvaluatorV2` which are two different classes where
+    the state and the reward of the agent for a better
+    aggregation, are defined differently.
     """
 
     def __init__(
@@ -119,31 +134,41 @@ class EvaluatorServer(BaseServer):
         global_model,
         size_traindata,
         size_testdata,
-        ninput=None,
-        noutput=None,
+        size=None,
         capacity=3,
         gamma=0.99,
         optimizer=None,
         *args,
         **kwargs
     ):
-        assert (
-            ninput is not None and noutput is not None
-        ), "`ninput` and `noutput` must be specified in configuration file"
+        """
+        Initialize the class
+
+        Parameters:
+
+            global_model (nn.Module):   the global model
+            size_traindata (list):      the list of sizes of local data for training
+                                        (supposed gotten by Federated Analytic)
+            size_testdata (list):       the list of sizes of local data for testing
+                                        (supposed gotten by Federated Analytic)
+            size (int):                 the number of workers
+            capacity (int):             the capacity of the moving batch size
+            gamma (float):              the discount factor used for reward
+            optimizer (Optimizer):      the optimizer for the agent
+        """
+        assert size is not None, "`size` must be specified in configuration file"
         super(EvaluatorServer, self).__init__(
             global_model, size_traindata, size_testdata
         )
         device = self.global_model.device
-        self.agent = ReinforceAgent(ninput, noutput, device).to(device)
+        self.agent = ReinforceAgent(size, size, device).to(device)
         self.optimizer = (
             torch.optim.Adam(self.agent.parameters(), lr=1e-3)
             if optimizer is None
             else optimizer(self.agent.parameters())
         )
-        self.nworkers = ninput
+        self.nworkers = size
         self.gamma = gamma
-        self.delta = 0  # Window for moving average
-        self.speed = log(1e-6) / log(1 - 0.95)
         self.accuracies = []  # accuracies during training of task model
         self.global_accuracies = []  # accuracies during testing of global task model
         self.alpha = 0.9  # window for exponential moving average
@@ -176,16 +201,19 @@ class EvaluatorServer(BaseServer):
         """
         tstep = torch.arange(len(self.rewards))
         rewards = torch.tensor(self.rewards)
-        r = rewards * self.gamma ** tstep
+        r = rewards * self.gamma**tstep
         r = r.flip(0).cumsum(0).flip(0)
-        return (r / self.gamma ** tstep)[-1]
+        return (r / self.gamma**tstep)[-1]
 
     def update_batch(self, state, action):
+        """
+        Update MovingBatch class
+        """
         pass
 
     def update(self, state):
         """
-        Update the global model and the agent policy
+        Update the global model
         """
         # Selection of gradients which are going
         # to participate to the next aggregation
@@ -231,7 +259,7 @@ class EvaluatorServer(BaseServer):
 
     def reset(self, filename=None):
         """
-        Reset working attributes
+        Reset work values for the next round
         """
         self.batchs.clear()
         self.participants_updates.clear()
@@ -240,7 +268,6 @@ class EvaluatorServer(BaseServer):
         self.global_accuracies.clear()
         self.batch_loss.clear()
         self.curr_selection.clear()
-        self.delta = 0
         if filename is not None:
             attrbs = {"title": "Evolution of loss function"}
             attrbs.update({"xrange": (0, len(self.losses) - 1)})

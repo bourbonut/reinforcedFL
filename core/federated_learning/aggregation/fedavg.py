@@ -3,7 +3,7 @@ from rich.table import Table
 from rich.align import Align
 from rich.live import Live
 from time import perf_counter
-import torch, pickle
+import pickle
 
 
 class FederatedAveraging(BaseServer):
@@ -14,10 +14,26 @@ class FederatedAveraging(BaseServer):
     """
 
     def __init__(self, global_model, size_traindata, size_testdata, *args, **kwargs):
+        """
+        Initialize the class
+
+        Parameters:
+
+            global_model (nn.Module):   the global model
+            size_traindata (list):      the list of sizes of local data for training
+                                        (supposed gotten by Federated Analytic)
+            size_testdata (list):       the list of sizes of local data for testing
+                                        (supposed gotten by Federated Analytic)
+        """
         super(FederatedAveraging, self).__init__(
             global_model, size_traindata, size_testdata
         )
-        self.batch_loss = []
+
+    def communicatewith(self, worker):
+        """
+        For convenience, this method is used for communication.
+        """
+        self.receive(worker.send())
 
     def update(self, indices):
         """
@@ -34,6 +50,7 @@ class FederatedAveraging(BaseServer):
             target_param.data.copy_(param.data)
         self.participants_updates.clear()
 
+# TODO : make one loop without first round
     def execute(
         self,
         nexp,
@@ -64,6 +81,7 @@ class FederatedAveraging(BaseServer):
 
             align = Align.center(table)
             with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
+                # First round
                 start = perf_counter()
                 # Selection of future participants
                 selection, indices_participants = scheduler.select_next_partipants()

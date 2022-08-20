@@ -9,7 +9,13 @@ import torch, pickle
 
 class EvaluatorV1(EvaluatorServer):
     """
-    Class based on `EvaluatorServer`
+    This class is based on the `REINFORCE` algorithm class from
+    the evaluator module (`core.evaluator`) for a better aggregation
+    (inspired by the algorithm `FRCCE` - `arXiv:2102.13314v1`)
+
+    The state is defined as the accuracies after aggregation 
+    The reward is computed as the exponential moving average
+    of the average of accuracies.
     """
 
     def __init__(
@@ -17,28 +23,58 @@ class EvaluatorV1(EvaluatorServer):
         global_model,
         size_traindata,
         size_testdata,
-        ninput=None,
-        noutput=None,
+        size=None,
         capacity=3,
         gamma=0.99,
         optimizer=None,
         *args,
         **kwargs,
     ):
+        """
+        Initialize the class
+
+        Parameters:
+
+            global_model (nn.Module):   the global model
+            size_traindata (list):      the list of sizes of local data for training
+                                        (supposed gotten by Federated Analytic)
+            size_testdata (list):       the list of sizes of local data for testing
+                                        (supposed gotten by Federated Analytic)
+            size (int):                 the number of workers
+            capacity (int):             the capacity of the moving batch size
+            gamma (float):              the discount factor used for reward
+            optimizer(Optimizer):       the optimizer for the agent
+        """
         super(EvaluatorV1, self).__init__(
             global_model,
             size_traindata,
             size_testdata,
-            ninput,
-            noutput,
+            size,
+            size,
             capacity,
             gamma,
             optimizer,
         )
-        self.delta = 0
+        self.delta = 0 # Window for moving average
+
+    def collect_accuracy(self, worker_accuracy):
+        """
+        The server collects local model accuracy through this method
+        """
+        self.accuracies.append(worker_accuracy)
+
+    def communicatewith(self, worker):
+        """
+        For convenience, this method is used for communication.
+        """
+        super().communicatewith(worker)
+        self.collect_accuracy(worker.evaluate(train=True, perlabel=True))  
 
     def compute_glb_acc(self, workers_accuracies, train=False):
-        indices = range(len(workers_accuracies))
+        """
+        Compute the global accuracy based on the Federated Averaging algorithm
+        """
+        indices = range(len(workers_accuracies)) # all workers are participants
         return super().compute_glb_acc(workers_accuracies, indices, train)
 
     def update_batch(self, state, action):
@@ -51,6 +87,9 @@ class EvaluatorV1(EvaluatorServer):
         self.batchs.update_size()
 
     def train_agent(self, action):
+        """
+        Train the agent for better aggregation
+        """
         p = sum(self.curr_selection)
         curr_accuracy = sum(compress(self.accuracies, self.curr_selection)) / p
         reward = curr_accuracy - self.delta
@@ -63,6 +102,13 @@ class EvaluatorV1(EvaluatorServer):
         self.accuracies.clear()
 
         return super().train_agent()
+    
+    def reset(self, filename=None):
+        """
+        Reset work values for the next round
+        """
+        self.delta = 0
+        return super().reset(filename)
 
     def execute(
         self, nexp, rounds, workers, train, evaluate, path, model, *args, **kwargs
