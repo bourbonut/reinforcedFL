@@ -117,7 +117,7 @@ class RandomScheduler(BaseScheduler):
 
     def select_next_partipants(self):
         population = list(range(self.size))
-        k = int(self.size * self.PORTION)
+        k = max(1, int(self.size * self.PORTION))
         sample = random.sample(population, k)
         selection = [int(i in sample) for i in range(self.size)]
         indices = [i for i in range(self.size) if selection[i]]

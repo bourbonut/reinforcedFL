@@ -29,7 +29,7 @@ class EvaluatorV2(EvaluatorServer):
         global_model,
         size_traindata,
         size_testdata,
-        size=None,
+        size,
         capacity=3,
         gamma=0.99,
         optimizer=None,
@@ -57,7 +57,6 @@ class EvaluatorV2(EvaluatorServer):
             global_model,
             size_traindata,
             size_testdata,
-            size,
             size,
             capacity,
             gamma,
@@ -167,7 +166,8 @@ class EvaluatorV2(EvaluatorServer):
                     state = torch.tensor(self.accuracies) - torch.tensor(
                         self.global_accuracies
                     )
-                    self.update(state)
+                    action = self.update(state)
+                    self.update_batch(state.tolist(), action.T)
 
                     # Workers evaluate accuracy of the global model
                     # on their local testing data

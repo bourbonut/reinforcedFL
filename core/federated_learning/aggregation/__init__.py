@@ -6,3 +6,5 @@ found in `core/federated_learning/participation.py`
 and are different for the definition of the state and the reward
 """
 from core.federated_learning.aggregation.fedavg import FederatedAveraging
+from core.federated_learning.aggregation.evaluatorv1 import EvaluatorV1
+from core.federated_learning.aggregation.evaluatorv2 import EvaluatorV2

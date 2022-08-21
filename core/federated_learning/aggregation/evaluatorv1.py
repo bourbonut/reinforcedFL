@@ -4,6 +4,7 @@ from rich.align import Align
 from rich.live import Live
 from time import perf_counter
 from itertools import compress
+from copy import copy
 import torch, pickle
 
 
@@ -23,7 +24,7 @@ class EvaluatorV1(EvaluatorServer):
         global_model,
         size_traindata,
         size_testdata,
-        size=None,
+        size,
         capacity=3,
         gamma=0.99,
         optimizer=None,
@@ -49,7 +50,6 @@ class EvaluatorV1(EvaluatorServer):
             global_model,
             size_traindata,
             size_testdata,
-            size,
             size,
             capacity,
             gamma,
@@ -97,7 +97,7 @@ class EvaluatorV1(EvaluatorServer):
         self.tracking_rewards.append(reward)
 
         # Update batch array
-        self.update_batch(self.accuracies, action.T)
+        self.update_batch(copy(self.accuracies), action.T)
         self.delta = self.delta + self.alpha * (curr_accuracy - self.delta)
         self.accuracies.clear()
 
