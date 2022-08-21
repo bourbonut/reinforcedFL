@@ -1,10 +1,7 @@
 from utils import *
 from core import *
 import model4FL
-import pickle, torch, json
-from core.federated_learning import aggregation, worker, participation
-import argparse
-from rich import print as rich_print
+import argparse, torch, json
 from rich.markdown import Markdown
 from rich.table import Table
 from rich.console import Console, Group
@@ -20,7 +17,7 @@ parser.add_argument(dest="model", help="model path")
 parser.add_argument(
     "--refresh", action="store_true", dest="refresh", help="Refresh data distribution"
 )
-parser.add_argument("--gpu", action="store_true", dest="gpu", help="Run on GPU")
+parser.add_argument("--cpu", action="store_false", dest="gpu", help="Run on CPU")
 args = parser.parse_args()
 
 # Introduction
@@ -74,13 +71,9 @@ panel = Panel("", title="Initialization")
 texts = []
 with Live(panel, auto_refresh=False) as live:
     if ON_GPU:
-        from core.sequential_gpu import train, evaluate
-
         texts.append(Align.center("The program is running on GPU"))
         panel.renderable = Group(*texts)
         live.refresh()
-    else:
-        from core.parallel import train, evaluate
 
     # Get the dataset
     dataname = parameters["environment"]["dataset"]
