@@ -59,7 +59,7 @@ Three configurations files must be created to run a simulation. It is recommende
 Comments with `#` must be deleted.
 
 - In an `environment` file :
-```json
+```
 {
     "nexps": 20,	# number of experiments
     "rounds": 10,	# number of rounds
@@ -70,7 +70,7 @@ Comments with `#` must be deleted.
 ```
 
 - In an `distribution` file :
-```json
+```
 {
     "label_distrb":"noniid",	# labels are non independent and identically distributed
     "minlabels":3,		# there are at least 3 labels per worker
@@ -81,7 +81,7 @@ Comments with `#` must be deleted.
 ```
 
 - In an `model` file :
-```json
+```
 {
   "worker_class": "Worker",		    # name of the worker class
   "server_class": "FederatedAveraging",	    # name of the algorithm for aggregation
