@@ -188,13 +188,14 @@ create(exp_path / "scheduler", verbose=False)
 global_accs = []
 state = []
 new_state = []
+old_action = []
 history = [[0.0, 0.0, 0.0] for _ in range(NWORKERS)]
 
 alltimes = [sum(worker.compute_times()) for worker in workers]
 ten_best = sorted(alltimes)[:int(len(workers) * 0.1)]
 best_indices = set([alltimes.index(i) for i in ten_best])
 print(sorted(alltimes))
-print(alltimes)
+# print(alltimes)
 print(best_indices)
 
 break_now = False
@@ -218,7 +219,8 @@ for iexp in range(NEXPS):
     align = Align.center(table)
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
         start = perf_counter()
-        selection = scheduler.select_next_partipants(state)
+        selection = scheduler.select_next_partipants(state, [])
+        old_action = list(selection)
         indices_participants = [i for i in range(len(workers)) if selection[i]]
         # print(f"{indices_participants = }")
         participants = [workers[i] for i in indices_participants]
@@ -268,7 +270,7 @@ for iexp in range(NEXPS):
             # Selection of future participants
             #print(f"{state = }")
             #print(f"{len(state) = }")
-            selection = scheduler.select_next_partipants(state)
+            action = selection = scheduler.select_next_partipants(state, old_action)
             indices_participants = [i for i in range(len(workers)) if selection[i]]
             already_selected.update(set(indices_participants))
             # indices_participants = random.sample(list(range(len(workers))), len(workers) // 10)
@@ -304,7 +306,8 @@ for iexp in range(NEXPS):
 
             server.update(indices_participants)
             reward = scheduler.compute_reward(selection, new_state)
-            scheduler.update(state, selection, reward, new_state)
+            scheduler.update(old_action, state, selection, reward, new_state)
+            old_action = list(action)
 
             for worker in workers:
                 worker.communicatewith(server)
@@ -345,6 +348,7 @@ for iexp in range(NEXPS):
     server.global_model = Model(nclasses, device).to(device)
     scheduler.reset()
     state.clear()
+    old_action.clear()
 
     # Reset workers
     for worker in workers:

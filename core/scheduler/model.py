@@ -81,8 +81,12 @@ class ActorCritic:
     def get_action(self, state):
         # print(state.size())
         probas = self.actor(state)
-        #print(probas)
-        return torch.bernoulli(probas).type(torch.int).tolist()
+        # print(probas)
+        p = 0
+        while p == 0: 
+            action = torch.bernoulli(probas).type(torch.int).tolist()
+            p = sum(action)
+        return action
 
 
 # class Policy(nn.Module):
