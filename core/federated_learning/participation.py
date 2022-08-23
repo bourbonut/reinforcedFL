@@ -23,31 +23,42 @@ class Scheduler:
         self.i = 0
         self.k = k
         self.participants = []
+        # self.old_reward = 0
 
     def normalize(self, state, selection, flatten=True):
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
         cstate = torch.tensor(list(compress(state.tolist(), selection)))
+        if cstate.shape[0] == 1:
+            return state / torch.cat([cstate] * state.size(0))
         mean = torch.cat([cstate.mean(0).unsqueeze(0)] * state.size(0))
         std = torch.cat([cstate.std(0).unsqueeze(0)] * state.size(0))
         state = (state - mean) / std
-        #state = state / torch.norm(state, dim=0)
         return state.flatten() if flatten else state
+
+    def norml2(self, state, selection, flatten=True):
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        cstate = torch.tensor(list(compress(state.tolist(), selection)))
+        state = state / torch.norm(state, dim=0)
+        return state.flatten() if flatten else state
+
 
     def minmax(self, times, selection):
         times = torch.tensor(times, dtype=torch.float).view(-1, self.k)
         ctimes = torch.tensor(list(compress(times.tolist(), selection)))
+        if ctimes.shape[0] == 1:
+            return times / torch.cat([ctimes] * times.size(0))
         min_ = torch.cat([ctimes.min(0)[0].unsqueeze(0)] * times.size(0))
         max_ = torch.cat([ctimes.max(0)[0].unsqueeze(0)] * times.size(0))
         return (times - min_) / (max_ - min_)
 
-    def select_next_partipants(self, state, old_action):
+    def select_next_partipants(self, state, old_action, debug=None):
         if state == []:
             population = list(range(self.action_dim))
             k = self.action_dim // 10
             sample = random.sample(population, k)
             self.participants.append([])
             return [int(i in sample) for i in range(self.action_dim)]
-        participants = self.agent.get_action(self.normalize(state, old_action))
+        participants = self.agent.get_action(self.normalize(state, old_action), debug=debug)
         self.participants.append(participants)
         return participants
 
@@ -58,8 +69,19 @@ class Scheduler:
 
     def compute_reward(self, action, new_state):
         action = torch.tensor(action)
-        scaled_times = self.minmax(new_state, action)
-        reward = -torch.max(scaled_times.sum(1) * action).item()
+        scaled_times = self.norml2(new_state, action, False)
+        reward = -torch.max(scaled_times.mean(1) * action).item()
+        # self.delta = reward  + 1 + 0.9 * (reward - self.delta)
+        # if reward > self.old_reward:
+            # self.old_reward = reward
+            # reward = 0.1
+        # elif reward < self.old_reward:
+            # self.old_reward = reward
+            # reward = -1
+        # else:
+            # self.old_reward = reward
+            # reward = 0
+        print("Reward:", reward)
         self.rewards.append(reward)
         return reward
 
@@ -75,11 +97,14 @@ class Scheduler:
         self.rewards.clear()
         self.action = None
         self.i += 1
+        # self.old_reward = 0
         self.agent.losses[0] = 0
         self.agent.losses[1] = 0
 
     def finish(self):
-        with open(self.path / f"selections.pkl", "wb") as file:
+        with open(self.path / "selections.pkl", "wb") as file:
             pickle.dump(self.participants, file)
+        with open(self.path / "rewards.pkl", "wb") as file:
+            pickle.dump(self.rewards, file)
         torch.save(self.agent.actor.state_dict(), self.path / "actor.pt")
         torch.save(self.agent.critic.state_dict(), self.path / "critic.pt")

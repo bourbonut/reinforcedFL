@@ -241,7 +241,8 @@ for iexp in range(NEXPS):
             else:
                 state.extend([0.0, 0.0, 0.0])
         means = [statistics.mean(filter(lambda x: x!=0., state[i::3])) for i in range(3)]
-        state = [means[i%3] if s==0. else s for i, s in enumerate(state)]
+        state = [(random.random() * 0.2 + 0.9) * means[i%3] if s==0. else s for i, s in enumerate(state)]
+        #print("Update state:", state)
         # print(f"{state = }")
         server.update(indices_participants)
 
@@ -270,7 +271,11 @@ for iexp in range(NEXPS):
             # Selection of future participants
             #print(f"{state = }")
             #print(f"{len(state) = }")
-            action = selection = scheduler.select_next_partipants(state, old_action)
+            try:
+                action = selection = scheduler.select_next_partipants(state, old_action, debug=alltimes)
+            except:
+                break_now = True
+                break
             indices_participants = [i for i in range(len(workers)) if selection[i]]
             already_selected.update(set(indices_participants))
             # indices_participants = random.sample(list(range(len(workers))), len(workers) // 10)

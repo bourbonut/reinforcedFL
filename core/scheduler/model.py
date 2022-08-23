@@ -48,6 +48,7 @@ class ActorCritic:
     def __init__(self, ninput, noutput, device, la=1e-3, lc=1e-2):
         self.device = device
         self.gamma = 0.99
+        self.minp = int(0.1 * noutput)
         self.actor = Actor(ninput, noutput, device).to(device)
         self.critic = Critic(ninput, device).to(device)
 
@@ -64,6 +65,8 @@ class ActorCritic:
 
         self.a_optim.zero_grad()
         loss.backward()
+        for param in self.actor.parameters():
+            param.grad.data.clamp_(-1, 1)
         self.a_optim.step()
 
     def train_critic(self, state, reward, state_):
@@ -75,16 +78,28 @@ class ActorCritic:
 
         self.c_optim.zero_grad()
         loss.backward()
+        for param in self.critic.parameters():
+            param.grad.data.clamp_(-1, 1)
         self.c_optim.step()
         return td_error.detach()
 
-    def get_action(self, state):
+    def get_action(self, state, debug=None):
         # print(state.size())
         probas = self.actor(state)
-        # print(probas)
+        if debug is not None:
+            x = [(s, p) for s, p in zip(debug, probas.tolist())]
+            print("Probalities:")
+            sx = sorted(x, key=lambda e: e[0])
+            for i in range(5):
+                data = sx[4 * i: 4 * (i + 1)]
+                print(", ".join((f"{a:>8_.3f}" + ":" + f"{b:.2%}" for a, b in data)))
         p = 0
-        while p == 0: 
-            action = torch.bernoulli(probas).type(torch.int).tolist()
+        while p < self.minp: 
+            try:
+                action = torch.bernoulli(probas).type(torch.int).tolist()
+            except:
+                print(state)
+                action = None
             p = sum(action)
         return action
 
