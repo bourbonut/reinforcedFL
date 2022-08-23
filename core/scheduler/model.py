@@ -1,3 +1,4 @@
+from rich import console
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -65,8 +66,8 @@ class ActorCritic:
 
         self.a_optim.zero_grad()
         loss.backward()
-        for param in self.actor.parameters():
-            param.grad.data.clamp_(-1, 1)
+        # for param in self.actor.parameters():
+        #     param.grad.data.clamp_(-1, 1)
         self.a_optim.step()
 
     def train_critic(self, state, reward, state_):
@@ -90,11 +91,17 @@ class ActorCritic:
             x = [(s, p) for s, p in zip(debug, probas.tolist())]
             print("Probalities:")
             sx = sorted(x, key=lambda e: e[0])
-            for i in range(5):
-                data = sx[4 * i: 4 * (i + 1)]
-                print(", ".join((f"{a:>8_.3f}" + ":" + f"{b:.2%}" for a, b in data)))
+            for i in range(10):
+                data = sx[10 * i : 10 * (i + 1)]
+                print(", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)))
+
+        # mean = probas.mean()
+        # action = [1 if x >= mean else 0 for x in probas.tolist()]
+        # selection = sorted(list(zip(range(100), probas.tolist())), key=lambda x:x[1])[-5:]
+        # indices = [x for x, _ in selection]
+        # action = [1 if i in indices else 0 for i in range(100)]
         p = 0
-        while p < self.minp: 
+        while p < self.minp:
             try:
                 action = torch.bernoulli(probas).type(torch.int).tolist()
             except:
