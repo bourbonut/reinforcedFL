@@ -9,7 +9,7 @@ from .path import *
 from .distribution import *
 from .plot import chart, topng
 from torchvision import datasets
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, Compose, Normalize
 from pygal.style import DefaultStyle
 
 
@@ -31,12 +31,14 @@ def dataset(name):
     path = DATA_PATH / name
     isavailable = path.exists()
     datasetfromtorch = hasattr(datasets, name)
+    cifar10 = Compose([ToTensor(), Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     if isavailable or datasetfromtorch:
+        transform = cifar10 if name == "CIFAR10" else ToTensor()
         loader = getattr(datasets, name)
         datatrain = loader(
-            root="data", train=True, download=not (isavailable), transform=ToTensor()
+            root="data", train=True, download=not (isavailable), transform=transform
         )
-        datatest = loader(root="data", train=False, transform=ToTensor())
+        datatest = loader(root="data", train=False, transform=transform)
         return datatrain, datatest
     else:
         raise RuntimeError("Dataset not found")
@@ -51,7 +53,7 @@ def toplot(global_accs):
             x_title="Rounds",
             y_title="Accuracy (in %)",
             print_labels=True,
-            margin_right = 75,
+            margin_right=75,
             # style=DefaultStyle(label_font_size=8),
         )
     )
