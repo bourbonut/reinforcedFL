@@ -19,6 +19,8 @@ class Worker:
 
     def __init__(
         self,
+        a,
+        b,
         model,
         data_path,
         epochs,
@@ -27,12 +29,14 @@ class Worker:
         criterion=nn.CrossEntropyLoss,
         **kwargs,
     ):
-        with open(data_path, "rb") as file:
-            data = pickle.load(file)
-        self._train, self._test = data
-        self.toloader = lambda data: DataLoader(
-            data, batch_size=batch_size, num_workers=1
-        )
+        # with open(data_path, "rb") as file:
+        #     data = pickle.load(file)
+        # self._train, self._test = data
+        # self.toloader = lambda data: DataLoader(
+        #     data, batch_size=batch_size, num_workers=1
+        # )
+        self._train, self._test = [], []
+        self.a, self.b = a, b
         self.speed = self.GROUPS[random.choice(range(len(self.GROUPS)))]
         self.network = random.choice(self.BANDWIDTHS)
         self.bandwidth_download = random.normalvariate(
@@ -41,12 +45,12 @@ class Worker:
         self.bandwidth_upload = random.normalvariate(
             self.network[1][0], self.network[1][1]
         )
-        self.model = model
-        self.device = self.model.device
+        # self.model = model
+        # self.device = self.model.device
         self.epochs = epochs
-        self.optim_obj = optimizer
-        self.optimizer = self.optim_obj(self.model.parameters())
-        self.criterion = criterion()
+        # self.optim_obj = optimizer
+        # self.optimizer = self.optim_obj(self.model.parameters())
+        # self.criterion = criterion()
         self.batch_size = batch_size
 
     def receive(self, parameters):
@@ -74,7 +78,7 @@ class Worker:
 
     def compute_times(self):
         return [
-            self.speed * (len(self._train) // self.batch_size) * self.epochs,
+            self.speed * (self.a // self.batch_size) * self.epochs,
             self.NB_PARAMS * 1e-6 * 32 / self.bandwidth_upload,
             self.NB_PARAMS * 1e-6 * 32 / self.bandwidth_download,
         ]

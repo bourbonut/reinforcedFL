@@ -8,7 +8,7 @@ from torch.distributions import Bernoulli
 
 
 class Actor(nn.Module):
-    NHIDDEN = 128
+    NHIDDEN = 256
 
     def __init__(self, state_dim, action_num, device):
         super(Actor, self).__init__()
@@ -27,7 +27,7 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
-    NHIDDEN = 128
+    NHIDDEN = 256
 
     def __init__(self, state_dim, device):
         super(Critic, self).__init__()
@@ -49,7 +49,8 @@ class ActorCritic:
     def __init__(self, ninput, noutput, device, la=1e-3, lc=1e-2):
         self.device = device
         self.gamma = 0.99
-        self.minp = int(0.1 * noutput)
+        # self.minp = int(0.1 * noutput)
+        self.minp = 1
         self.actor = Actor(ninput, noutput, device).to(device)
         self.critic = Critic(ninput, device).to(device)
 
@@ -71,7 +72,7 @@ class ActorCritic:
         self.a_optim.step()
 
     def train_critic(self, state, reward, state_):
-        v_ = self.critic(state_)
+        v_ = self.critic(state_).detach()
         v = self.critic(state)
         td_error = reward + self.gamma * v_ - v
         loss = torch.square(td_error)
@@ -79,8 +80,8 @@ class ActorCritic:
 
         self.c_optim.zero_grad()
         loss.backward()
-        for param in self.critic.parameters():
-            param.grad.data.clamp_(-1, 1)
+        # for param in self.critic.parameters():
+        #     param.grad.data.clamp_(-1, 1)
         self.c_optim.step()
         return td_error.detach()
 
@@ -91,9 +92,11 @@ class ActorCritic:
             x = [(s, p) for s, p in zip(debug, probas.tolist())]
             print("Probalities:")
             sx = sorted(x, key=lambda e: e[0])
+            string = ""
             for i in range(10):
                 data = sx[10 * i : 10 * (i + 1)]
-                print(", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)))
+                string += ", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)) + "\n"
+            print(string)
 
         # mean = probas.mean()
         # action = [1 if x >= mean else 0 for x in probas.tolist()]
@@ -112,7 +115,7 @@ class ActorCritic:
 
 
 # class Policy(nn.Module):
-#     NHIDDEN = 128
+#     NHIDDEN = 256
 #     def __init__(self, state_dim, action_dim, device):
 #         super(Policy, self).__init__()
 #         self.device = device

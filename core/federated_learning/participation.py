@@ -2,7 +2,7 @@ from core.scheduler.model import ActorCritic
 from torch.distributions import Bernoulli
 from torch.nn import functional as F
 import torch
-from math import log
+from math import log, exp
 import random, pickle
 from itertools import compress
 
@@ -19,6 +19,7 @@ class Scheduler:
         self.k = k
         self.participants = []
         self.old_time = 0
+        self.delta = 0
 
     def normalize(self, state, selection, flatten=True):
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
@@ -53,7 +54,7 @@ class Scheduler:
             self.participants.append([])
             return [int(i in sample) for i in range(self.action_dim)]
         participants = self.agent.get_action(
-            self.norml2(state, old_action), debug=debug
+            self.normalize(state, old_action), debug=debug
         )
         self.participants.append(participants)
         return participants
@@ -64,31 +65,52 @@ class Scheduler:
             yield list_[k * i : k * (i + 1)]
 
     def compute_reward(self, action, new_state):
+        k = sum(action)
         action = torch.tensor(action)
         scaled_times = self.minmax(new_state, action, False)
         x = scaled_times.sum(1) * action
         index = torch.argmax(x).item()
         times = torch.tensor(new_state).view(-1, self.k)
         time = times.sum(1)[index].item()
-        # reward = -torch.max(x).item()
-        # self.delta = reward  + 1 + 0.9 * (reward - self.delta)
-        if time > self.old_time:
-            reward = -1
-            self.old_time = time
-        elif time < self.old_time:
-            reward = 1
-            self.old_time = time
-        else:
-            reward = 0
-            self.old_time = time
+        not_scaled_times = times.sum(1) * action
+        # reward = -exp(-torch.max(x).item() * k / 100)
+        # reward = -exp((-torch.max(x).item() - torch.min(x).item()) * k / 100)
+        print("Delta avant:", self.delta)
+        rt = -(torch.max(not_scaled_times).item() + torch.min(not_scaled_times).item()) / 100
+        print("Rt:", rt)
+        reward = rt - self.delta
+        self.delta = self.delta + 0.9 * (reward - self.delta)
+        print("Delta après:", self.delta)
+        # self.old_time = reward
+        # reward = -torch.mean(x).item()
+
+        # if value > self.old_time:
+        #     reward = -1
+        #     self.old_time = value
+        # elif value < self.old_time:
+        #     reward = 1
+        #     self.old_time = value
+        # else:
+        #     reward = 0
+        #     self.old_time = value
+
+        # if time > self.old_time:
+        #     reward = -1 # * k
+        #     self.old_time = time
+        # elif time < self.old_time:
+        #     reward = 1 # * k
+        #     self.old_time = time
+        # else:
+        #     reward = 0
+        #     self.old_time = time
 
         print("Reward:", reward)
         self.rewards.append(reward)
         return reward
 
     def update(self, old_action, state, action, reward, new_state):
-        normalized_state = self.norml2(state, old_action)
-        normalized_new_state = self.norml2(new_state, action)
+        normalized_state = self.normalize(state, old_action)
+        normalized_new_state = self.normalize(new_state, action)
         td_error = self.agent.train_critic(
             normalized_state, reward, normalized_new_state
         )
@@ -100,7 +122,8 @@ class Scheduler:
         self.rewards.clear()
         self.action = None
         self.i += 1
-        self.old_time = -1
+        self.old_time = 0
+        self.delta = 0
         self.agent.losses[0] = 0
         self.agent.losses[1] = 0
 

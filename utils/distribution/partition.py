@@ -148,6 +148,9 @@ def generate(
         return indices
 
     distrb_per_wk = {"Worker {}".format(i): [0] * len(labels) for i in range(nworkers)}
+
+    allpartitions = []
+
     for k, worker_labels in enumerate(distrb):
         # Worker training indices
         indices_per_labels = tuple(map(train_pickup, worker_labels))
@@ -162,6 +165,7 @@ def generate(
             WorkerDataset(worker_labels, [datatrain[i] for i in wktrain_indices]),
             WorkerDataset(worker_labels, [datatest[i] for i in wktest_indices]),
         ]
+        allpartitions.append((len(worker_data[0]), len(worker_data[1])))
 
         if save2png:  # y_stacked of the function `stacked`
             for label, indices in zip(worker_labels, indices_per_labels):
@@ -171,6 +175,9 @@ def generate(
         with open(path / name_file, "wb") as file:
             pickle.dump(worker_data, file)
         print("Data for worker {} saved".format(k + 1))
+
+    with open(path / "allpartitions.pkl", "wb") as file:
+        pickle.dump(allpartitions, file)
 
     if save2png:
         stacked(

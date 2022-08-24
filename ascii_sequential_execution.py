@@ -159,8 +159,11 @@ with Live(panel, auto_refresh=False) as live:
     live.refresh()
     models = (Model(nclasses, device) for _ in range(NWORKERS))
     batch_size = parameters["model"].get("batch_size", 64)
+    with open(wk_data_path / "allpartitions.pkl", "rb") as file:
+        allpartitions = pickle.load(file)
     workers = tuple(
         worker_class(
+            *allpartitions[i],
             model.to(device),
             wk_data_path / f"worker-{i+1}.pkl",
             EPOCHS,
