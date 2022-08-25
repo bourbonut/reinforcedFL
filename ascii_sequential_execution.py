@@ -173,14 +173,18 @@ with Live(panel, auto_refresh=False) as live:
     )
     server.n = [len(worker._train) for worker in workers]
     server.t = [len(worker._test) for worker in workers]
-    a = [worker.computation_speed for worker in workers]
-    b = [worker.network[0][0] for worker in workers]
-    c = [worker.network[1][0] for worker in workers]
-    scheduler.mean = [statistics.mean(x) for x in (a, b, c)]
+    a = [
+        worker.computation_speed * (worker.a // worker.batch_size) * worker.epochs
+        for worker in workers
+    ]
+    b = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[0][0] for worker in workers]
+    c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][0] for worker in workers]
+    alltimes = [statistics.mean(m) for m in zip(a, b, c)]
+    scheduler.mean = torch.tensor([[statistics.mean(x) for x in (a, b, c)]] * NWORKERS)
     a = [worker.STD for worker in workers]
-    b = [worker.network[0][1] for worker in workers]
-    c = [worker.network[1][1] for worker in workers]
-    scheduler.std = [statistics.mean(x) for x in (a, b, c)]
+    b = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[0][1] for worker in workers]
+    c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][1] for worker in workers]
+    scheduler.std = torch.tensor([[statistics.mean(x) for x in (a, b, c)]] * NWORKERS)
     texts[-1] = Align.center("[green]Workers are successfully initialized.[/]")
     panel.renderable = Group(*texts)
     live.refresh()
@@ -197,7 +201,7 @@ new_state = []
 old_action = []
 history = [[0.0, 0.0, 0.0] for _ in range(NWORKERS)]
 
-alltimes = [sum(worker.compute_times()) for worker in workers]
+# alltimes = []
 ten_best = sorted(alltimes)[: int(len(workers) * 0.1)]
 best_indices = set([alltimes.index(i) for i in ten_best])
 sx = sorted(alltimes)

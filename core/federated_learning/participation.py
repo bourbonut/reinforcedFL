@@ -72,11 +72,12 @@ class Scheduler:
         self.i = 0
         self.k = k
         self.participants = []
-        self.batchs = MovingBatch(3, device)
+        self.batchs = MovingBatch(4, device)
         self.mean = mean
         self.std = std
 
     def norm(self, state, flatten=True):
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
         state = (state - self.mean) / self.std
         return state.flatten() if flatten else state
 
@@ -118,6 +119,7 @@ class Scheduler:
         # Update batch
         self.batchs.states.append(normalized_state.view(-1, self.k).sum(1))
         self.batchs.actions.append([i for i, x in enumerate(participants) if x])
+        self.batchs.update_size()
 
         self.participants.append(participants)
         return participants
@@ -127,27 +129,32 @@ class Scheduler:
         for i in range(len(list_) // k):
             yield list_[k * i : k * (i + 1)]
 
-    def compute_reward(self):
-        states = self.batchs.states
-        actions = self.batchs.actions
-        selected = reduce(lambda x, y: x.union(y), map(set, actions))
-        action = [1 if x in selected else 0 for x in selected]
-        speed = states[-1] - states[0]
-        sign = partial(copysign, 1)
-        select = lambda x: -1 if x == 1 else 1
-        rt = lambda sp, ac: select(ac) * sign(sp)
-        reward = reduce(lambda x, y: x + rt(*y), zip(speed, action)) / len(action)
-        print("Reward:", reward)
-        self.rewards.append(reward)
-        return reward
+    def compute_reward(self, _x, _y):
+        if self.batchs.isfull():
+            states = self.batchs.states
+            actions = self.batchs.actions
+            selected = reduce(lambda x, y: x.union(y), map(set, actions))
+            action = [1 if x in selected else 0 for x in selected]
+            speed = states[-1] - states[0]
+            sign = partial(copysign, 1)
+            select = lambda x: -1 if x == 1 else 1
+            rt = lambda sp, ac: select(ac) * sign(sp)
+            iterator = zip(speed, action)
+            reward = reduce(lambda x, y: x + rt(*y), iterator, rt(*next(iterator))) / sum(action)
+            print("Reward:", reward)
+            self.rewards.append(reward)
+            return reward
+        else:
+            return None
 
     def update(self, old_action, state, action, reward, new_state):
-        normalized_state = self.norm(state, old_action)
-        normalized_new_state = self.norm(new_state, action)
-        td_error = self.agent.train_critic(
-            normalized_state, reward, normalized_new_state
-        )
-        self.agent.train_actor(normalized_state, action, td_error)
+        if reward is not None:
+            normalized_state = self.norm(state, old_action)
+            normalized_new_state = self.norm(new_state, action)
+            td_error = self.agent.train_critic(
+                normalized_state, reward, normalized_new_state
+            )
+            self.agent.train_actor(normalized_state, action, td_error)
 
     def reset(self):
         with open(self.path / f"rewards-{self.i}.pkl", "wb") as file:
@@ -159,6 +166,7 @@ class Scheduler:
         self.delta = 0
         self.agent.losses[0] = 0
         self.agent.losses[1] = 0
+        self.batchs.clear()
 
     def finish(self):
         with open(self.path / "selections.pkl", "wb") as file:
