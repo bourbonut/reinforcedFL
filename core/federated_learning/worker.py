@@ -39,12 +39,12 @@ class Worker:
         self.a, self.b = a, b
         self.speed = self.GROUPS[random.choice(range(len(self.GROUPS)))]
         self.network = random.choice(self.BANDWIDTHS)
-        self.bandwidth_download = random.normalvariate(
+        self.bandwidth_download = abs(random.normalvariate(
             self.network[0][0], self.network[0][1]
-        )
-        self.bandwidth_upload = random.normalvariate(
+        ))
+        self.bandwidth_upload = abs(random.normalvariate(
             self.network[1][0], self.network[1][1]
-        )
+        ))
         # self.model = model
         # self.device = self.model.device
         self.epochs = epochs

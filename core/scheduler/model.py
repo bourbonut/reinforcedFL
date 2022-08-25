@@ -8,7 +8,7 @@ from torch.distributions import Bernoulli
 
 
 class Actor(nn.Module):
-    NHIDDEN = 256
+    NHIDDEN = 128
 
     def __init__(self, state_dim, action_num, device):
         super(Actor, self).__init__()
@@ -27,7 +27,7 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
-    NHIDDEN = 256
+    NHIDDEN = 128
 
     def __init__(self, state_dim, device):
         super(Critic, self).__init__()
@@ -88,15 +88,15 @@ class ActorCritic:
     def get_action(self, state, debug=None):
         # print(state.size())
         probas = self.actor(state)
-        if debug is not None:
-            x = [(s, p) for s, p in zip(debug, probas.tolist())]
-            print("Probalities:")
-            sx = sorted(x, key=lambda e: e[0])
-            string = ""
-            for i in range(10):
-                data = sx[10 * i : 10 * (i + 1)]
-                string += ", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)) + "\n"
-            print(string)
+        # if debug is not None:
+        #     x = [(s, p) for s, p in zip(debug, probas.tolist())]
+        #     print("Probalities:")
+        #     sx = sorted(x, key=lambda e: e[0])
+        #     string = ""
+        #     for i in range(10):
+        #         data = sx[10 * i : 10 * (i + 1)]
+        #         string += ", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)) + "\n"
+        #     print(string)
 
         # mean = probas.mean()
         # action = [1 if x >= mean else 0 for x in probas.tolist()]
@@ -115,7 +115,7 @@ class ActorCritic:
 
 
 # class Policy(nn.Module):
-#     NHIDDEN = 256
+#     NHIDDEN = 128
 #     def __init__(self, state_dim, action_dim, device):
 #         super(Policy, self).__init__()
 #         self.device = device

@@ -67,20 +67,28 @@ class Scheduler:
     def compute_reward(self, action, new_state):
         k = sum(action)
         action = torch.tensor(action)
-        scaled_times = self.minmax(new_state, action, False)
-        x = scaled_times.sum(1) * action
-        index = torch.argmax(x).item()
         times = torch.tensor(new_state).view(-1, self.k)
-        time = times.sum(1)[index].item()
+        scaled_times = self.minmax(new_state, action, False)
         not_scaled_times = times.sum(1) * action
+        # x = scaled_times.sum(1) * action
+        # index = torch.argmax(x).item()
+        # time = times.sum(1)[index].item()
         # reward = -exp(-torch.max(x).item() * k / 100)
         # reward = -exp((-torch.max(x).item() - torch.min(x).item()) * k / 100)
-        print("Delta avant:", self.delta)
-        rt = -(torch.max(not_scaled_times).item() + torch.min(not_scaled_times).item()) / 100
-        print("Rt:", rt)
-        reward = rt - self.delta
-        self.delta = self.delta + 0.9 * (reward - self.delta)
-        print("Delta après:", self.delta)
+        # print("Delta avant:", self.delta)
+        # rt = -(torch.max(not_scaled_times).item() + torch.min(not_scaled_times).item())
+        # print("Rt:", rt)
+        # reward = rt - self.delta
+        # self.delta = self.delta + 0.9 * (reward - self.delta)
+        # print("Delta après:", self.delta)
+        # reward = torch.max(not_scaled_times).item() + torch.min(not_scaled_times).item()
+        # reward = (reward - not_scaled_times.mean()) / not_scaled_times.std() * k / 100
+
+        time_action = scaled_times.sum(1) * action
+        reward =  2 * scaled_times.sum(1).mean() - (torch.max(time_action) + torch.min(time_action))
+        # reward = reward * 2
+
+
         # self.old_time = reward
         # reward = -torch.mean(x).item()
 
