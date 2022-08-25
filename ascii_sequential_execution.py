@@ -173,6 +173,14 @@ with Live(panel, auto_refresh=False) as live:
     )
     server.n = [len(worker._train) for worker in workers]
     server.t = [len(worker._test) for worker in workers]
+    a = [worker.computation_speed for worker in workers]
+    b = [worker.network[0][0] for worker in workers]
+    c = [worker.network[1][0] for worker in workers]
+    scheduler.mean = [statistics.mean(x) for x in (a, b, c)]
+    a = [worker.STD for worker in workers]
+    b = [worker.network[0][1] for worker in workers]
+    c = [worker.network[1][1] for worker in workers]
+    scheduler.std = [statistics.mean(x) for x in (a, b, c)]
     texts[-1] = Align.center("[green]Workers are successfully initialized.[/]")
     panel.renderable = Group(*texts)
     live.refresh()
@@ -259,16 +267,9 @@ for iexp in range(NEXPS):
             start = perf_counter()
 
             # Selection of future participants
-            # print(f"{state = }")
-            # print(f"{len(state) = }")
-            # try:
             action = selection = scheduler.select_next_partipants(
                 state, old_action, debug=alltimes
             )
-            # except:
-            #     break_now = True
-            #     break
-
             indices_participants = [i for i in range(NWORKERS) if selection[i]]
             already_selected.update(set(indices_participants))
             # print(f"{indices_participants = }")
