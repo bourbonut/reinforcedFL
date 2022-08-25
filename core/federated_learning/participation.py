@@ -60,7 +60,9 @@ class MovingBatch:
 
 
 class Scheduler:
-    def __init__(self, ninput, noutput, device, path, k=1, mean=None, std=None, **kwargs):
+    def __init__(
+        self, ninput, noutput, device, path, k=1, mean=None, std=None, **kwargs
+    ):
         self.agent = ActorCritic(ninput * k, noutput, device, la=1e-3, lc=1e-2)
         self.device = device
         self.rewards = []
