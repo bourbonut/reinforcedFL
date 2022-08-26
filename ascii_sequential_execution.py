@@ -199,19 +199,17 @@ global_accs = []
 state = []
 new_state = []
 old_action = []
-history = [[0.0, 0.0, 0.0] for _ in range(NWORKERS)]
 
 # alltimes = []
 ten_best = sorted(alltimes)[: int(len(workers) * 0.1)]
 best_indices = set([alltimes.index(i) for i in ten_best])
 sx = sorted(alltimes)
-# for i in range(2):
-#     data = sx[10 * i: 10 * (i + 1)]
-print(", ".join((f"{x:>8_.3f}" for x in sx)))
-# print(alltimes)
-print(best_indices)
+# print(", ".join((f"{x:>8_.3f}" for x in sx)))
+# print(best_indices)
 
 break_now = False
+
+times = []
 
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))
@@ -266,6 +264,7 @@ for iexp in range(NEXPS):
             f"{max_time:.3f} s",
             "Random round",
         )
+        times.append(max_time)
         live.refresh()
         for r in range(1, ROUNDS):
             start = perf_counter()
@@ -311,6 +310,7 @@ for iexp in range(NEXPS):
                 f"{max_time:.3f} s",
                 f"{(ratio, len(indices_participants), len(already_selected))}",
             )
+            times.append(max_time)
             live.refresh()
 
     if break_now:
@@ -322,4 +322,7 @@ for iexp in range(NEXPS):
 
 
 scheduler.finish()
+with open(exp_path / "scheduler" / "times.pkl", "wb") as file:
+    pickle.dump(times, file)
+
 console.print("Finished.")

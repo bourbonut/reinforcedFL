@@ -57,6 +57,7 @@ class ActorCritic:
         self.a_optim = Adam(self.actor.parameters(), lr=la)
         self.c_optim = Adam(self.critic.parameters(), lr=lc)
         self.losses = [0, 0]
+        self.probabilities = []
 
     def train_actor(self, state, action, td_error):
         probas = self.actor(state)
@@ -90,13 +91,14 @@ class ActorCritic:
         probas = self.actor(state)
         if debug is not None:
             x = [(s, p) for s, p in zip(debug, probas.tolist())]
-            print("Probalities:")
+            # print("Probalities:")
             sx = sorted(x, key=lambda e: e[0])
-            string = ""
-            for i in range(10):
-                data = sx[10 * i : 10 * (i + 1)]
-                string += ", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)) + "\n"
-            print(string)
+            self.probabilities.append([b for a, b in sx])
+            # string = ""
+            # for i in range(10):
+            #     data = sx[10 * i : 10 * (i + 1)]
+            #     string += ", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)) + "\n"
+            # print(string)
 
         # mean = probas.mean()
         # action = [1 if x >= mean else 0 for x in probas.tolist()]

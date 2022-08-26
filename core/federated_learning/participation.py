@@ -112,6 +112,10 @@ class Scheduler:
             k = self.action_dim // 10
             sample = random.sample(population, k)
             self.participants.append([])
+            if len(self.agent.probabilities)>0:
+                self.agent.probabilities.append(self.agent.probabilities[-1])
+            else:
+                self.agent.probabilities.append([0.] * self.action_dim)
             return [int(i in sample) for i in range(self.action_dim)]
         normalized_state = self.norm(state, old_action)
         participants = self.agent.get_action(normalized_state, debug=debug)
@@ -137,10 +141,11 @@ class Scheduler:
             action = [1 if x in selected else 0 for x in selected]
             speed = states[-1] - states[0]
             sign = partial(copysign, 1)
-            select = lambda x: -1 if x == 1 else 1
-            rt = lambda sp, ac: select(ac) * sign(sp)
+            select = lambda x : 1 if x==1 else -1
+            rt = lambda sp, ac: ac * (sign(sp) if sp != 0 else 0) # * abs(sp)
             iterator = zip(speed, action)
             reward = reduce(lambda x, y: x + rt(*y), iterator, rt(*next(iterator))) / sum(action)
+            # reward = (reward / 1000).item()
             print("Reward:", reward)
             self.rewards.append(reward)
             return reward
@@ -171,7 +176,7 @@ class Scheduler:
     def finish(self):
         with open(self.path / "selections.pkl", "wb") as file:
             pickle.dump(self.participants, file)
-        with open(self.path / "rewards.pkl", "wb") as file:
-            pickle.dump(self.rewards, file)
+        with open(self.path / "probabilities.pkl", "wb") as file:
+            pickle.dump(self.agent.probabilities, file)
         torch.save(self.agent.actor.state_dict(), self.path / "actor.pt")
         torch.save(self.agent.critic.state_dict(), self.path / "critic.pt")
