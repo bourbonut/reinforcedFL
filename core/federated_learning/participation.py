@@ -63,7 +63,7 @@ class Scheduler:
     def __init__(
         self, ninput, noutput, device, path, k=1, mean=None, std=None, **kwargs
     ):
-        self.agent = ActorCritic(ninput * k, noutput, device, la=1e-3, lc=1e-2)
+        self.agent = ActorCritic(ninput * k, noutput, device, lr=1e-2)
         self.device = device
         self.rewards = []
         self.action_dim = noutput
@@ -72,9 +72,11 @@ class Scheduler:
         self.i = 0
         self.k = k
         self.participants = []
-        self.batchs = MovingBatch(4, device)
+        self.batchs = MovingBatch(2, device)
         self.mean = mean
         self.std = std
+        self.old_time = 0
+        self.delta = 0
 
     def norm(self, state, flatten=True):
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
@@ -117,10 +119,10 @@ class Scheduler:
             else:
                 self.agent.probabilities.append([0.] * self.action_dim)
             return [int(i in sample) for i in range(self.action_dim)]
-        normalized_state = self.norm(state, old_action)
+        normalized_state = self.normalize(state, old_action)
         participants = self.agent.get_action(normalized_state, debug=debug)
 
-        # Update batch
+        # # Update batch
         self.batchs.states.append(normalized_state.view(-1, self.k).sum(1))
         self.batchs.actions.append([i for i, x in enumerate(participants) if x])
         self.batchs.update_size()
@@ -133,33 +135,39 @@ class Scheduler:
         for i in range(len(list_) // k):
             yield list_[k * i : k * (i + 1)]
 
-    def compute_reward(self, _x, _y):
-        if self.batchs.isfull():
-            states = self.batchs.states
-            actions = self.batchs.actions
-            selected = reduce(lambda x, y: x.union(y), map(set, actions))
-            action = [1 if x in selected else 0 for x in selected]
-            speed = states[-1] - states[0]
-            sign = partial(copysign, 1)
-            select = lambda x : 1 if x==1 else -1
-            rt = lambda sp, ac: ac * (sign(sp) if sp != 0 else 0) # * abs(sp)
-            iterator = zip(speed, action)
-            reward = reduce(lambda x, y: x + rt(*y), iterator, rt(*next(iterator))) / sum(action)
-            # reward = (reward / 1000).item()
-            print("Reward:", reward)
-            self.rewards.append(reward)
-            return reward
-        else:
-            return None
+    def compute_reward(self, action, new_state):
+        action = torch.tensor(action)
+        normalized_new_state = self.minmax(new_state, action, False)
+        time = -torch.max(normalized_new_state.sum(1) * action).item()
+        reward = (time - self.old_time) * 10
+        self.old_time = time
+        # new_state = torch.tensor(new_state).view(-1, self.k)
+        # reward = -torch.max(new_state.sum(1) * action).item()
+        self.rewards.append(reward)
+        self.agent.rewards.append(reward)
+        
+        # if self.batchs.isfull():
+        #     states = self.batchs.states
+        #     actions = self.batchs.actions
+        #     selected = reduce(lambda x, y: x.union(y), map(set, actions))
+        #     action = [1 if x in selected else 0 for x in selected]
+        #     speed = states[-1] - states[0]
+        #     sign = partial(copysign, 1)
+        #     select = lambda x : 1 if x==1 else -1
+        #     rt = lambda sp, ac: select(ac) * (sign(sp) if sp != 0 else 0) # * abs(sp)
+        #     iterator = zip(speed, action)
+        #     reward = reduce(lambda x, y: x + rt(*y), iterator, rt(*next(iterator))) / sum(action)
+        #     reward = reward * 10
+        #     # reward = (reward / 1000).item()
+        #     # print("Reward:", reward)
+        #     self.rewards.append(reward)
+        #     self.agent.rewards.append(reward)
+        #     # return reward
+        # # else:
+        #     # return None
 
-    def update(self, old_action, state, action, reward, new_state):
-        if reward is not None:
-            normalized_state = self.norm(state, old_action)
-            normalized_new_state = self.norm(new_state, action)
-            td_error = self.agent.train_critic(
-                normalized_state, reward, normalized_new_state
-            )
-            self.agent.train_actor(normalized_state, action, td_error)
+    def update(self):
+        self.agent.train_agent()
 
     def reset(self):
         with open(self.path / f"rewards-{self.i}.pkl", "wb") as file:
@@ -169,8 +177,8 @@ class Scheduler:
         self.i += 1
         self.old_time = 0
         self.delta = 0
-        self.agent.losses[0] = 0
-        self.agent.losses[1] = 0
+        # self.agent.losses[0] = 0
+        # self.agent.losses[1] = 0
         self.batchs.clear()
 
     def finish(self):
@@ -178,5 +186,5 @@ class Scheduler:
             pickle.dump(self.participants, file)
         with open(self.path / "probabilities.pkl", "wb") as file:
             pickle.dump(self.agent.probabilities, file)
-        torch.save(self.agent.actor.state_dict(), self.path / "actor.pt")
-        torch.save(self.agent.critic.state_dict(), self.path / "critic.pt")
+        torch.save(self.agent.agent.state_dict(), self.path / "actor.pt")
+        torch.save(self.agent.agent.state_dict(), self.path / "critic.pt")

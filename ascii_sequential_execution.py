@@ -289,8 +289,7 @@ for iexp in range(NEXPS):
                     new_state.extend(state[3 * i : 3 * (i + 1)])
 
             # print(f"Reward of round {r + 1}")
-            reward = scheduler.compute_reward(selection, new_state)
-            scheduler.update(old_action, state, selection, reward, new_state)
+            scheduler.compute_reward(selection, new_state)
             old_action = list(action)
 
             duration = perf_counter() - start
@@ -316,6 +315,7 @@ for iexp in range(NEXPS):
     if break_now:
         break
 
+    scheduler.update()
     scheduler.reset()
     state.clear()
     old_action.clear()

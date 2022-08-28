@@ -1,139 +1,104 @@
-from rich import console
 import torch
-from torch import nn
+from torch import log, nn
 from torch.nn import functional as F
-from torch import tensor
 from torch.optim import Adam
 from torch.distributions import Bernoulli
+from collections import namedtuple
+
+SavedAction = namedtuple('SavedAction', ['log_prob', 'value'])
 
 
-class Actor(nn.Module):
-    NHIDDEN = 256
+class Policy(nn.Module):
 
-    def __init__(self, state_dim, action_num, device):
-        super(Actor, self).__init__()
-        self.input = nn.Linear(state_dim, self.NHIDDEN)
-        self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.output = nn.Linear(self.NHIDDEN, action_num)
+    NHIDDEN = 64
+
+    def __init__(self, ninput, noutput, device):
+        super(Policy, self).__init__()
+        self.affine1 = nn.Linear(ninput, self.NHIDDEN)
+        self.affine2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        self.affine3 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+
+        # actor's layer
+        self.action_head = nn.Linear(self.NHIDDEN, noutput)
+
+        # critic's layer
+        self.value_head = nn.Linear(self.NHIDDEN, 1)
+
+        # action & reward buffer
         self.device = device
 
     def forward(self, x):
         x = x.to(self.device)
-        x = torch.tanh(self.input(x))
-        x = torch.tanh(self.hidden1(x))
-        x = torch.tanh(self.hidden2(x))
-        return (torch.tanh(self.output(x)) + 1) * 0.5
+        x = F.sigmoid(self.affine1(x))
+        x = F.sigmoid(self.affine2(x))
+        x = F.sigmoid(self.affine3(x))
 
+        # actor: choses action to take from state s_t 
+        # by returning probability of each action
+        action_prob = (torch.tanh(self.action_head(x)) + 1.) * 0.5
 
-class Critic(nn.Module):
-    NHIDDEN = 256
+        # critic: evaluates being in the state s_t
+        state_values = self.value_head(x)
 
-    def __init__(self, state_dim, device):
-        super(Critic, self).__init__()
-        self.input = nn.Linear(state_dim, self.NHIDDEN)
-        self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.output = nn.Linear(self.NHIDDEN, 1)
-        self.device = device
-
-    def forward(self, x):
-        x = x.to(self.device)
-        x = torch.tanh(self.input(x))
-        x = torch.tanh(self.hidden1(x))
-        x = torch.tanh(self.hidden2(x))
-        return self.output(x)
-
+        # return values for both actor and critic as a tuple of 2 values:
+        # 1. a list with the probability of each action over the action space
+        # 2. the value from state s_t 
+        return action_prob, state_values
 
 class ActorCritic:
-    def __init__(self, ninput, noutput, device, la=1e-3, lc=1e-2):
-        self.device = device
-        self.gamma = 0.99
-        # self.minp = int(0.1 * noutput)
-        self.minp = 1
-        self.actor = Actor(ninput, noutput, device).to(device)
-        self.critic = Critic(ninput, device).to(device)
 
-        self.a_optim = Adam(self.actor.parameters(), lr=la)
-        self.c_optim = Adam(self.critic.parameters(), lr=lc)
-        self.losses = [0, 0]
+    def __init__(self, ninput, noutput, device, lr=1e-3):
+        self.agent = Policy(ninput, noutput, device).to(device)
+        self.device = device
+        self.saved_actions = []
+        self.rewards = []
+        self.optimizer = Adam(self.agent.parameters(), lr=lr)
+        self.gamma = 0.99
+        self.losses = []
         self.probabilities = []
 
-    def train_actor(self, state, action, td_error):
-        probas = self.actor(state)
-        action = torch.bernoulli(probas)
-        logprob = torch.log(probas) * action
-        loss = -logprob.sum() * td_error
-        self.losses[1] = loss.item()
-
-        self.a_optim.zero_grad()
-        loss.backward()
-        # for param in self.actor.parameters():
-        #     param.grad.data.clamp_(-1, 1)
-        self.a_optim.step()
-
-    def train_critic(self, state, reward, state_):
-        v_ = self.critic(state_).detach()
-        v = self.critic(state)
-        td_error = reward + self.gamma * v_ - v
-        loss = torch.square(td_error)
-        self.losses[0] = loss.item()
-
-        self.c_optim.zero_grad()
-        loss.backward()
-        # for param in self.critic.parameters():
-        #     param.grad.data.clamp_(-1, 1)
-        self.c_optim.step()
-        return td_error.detach()
-
     def get_action(self, state, debug=None):
-        # print(state.size())
-        probas = self.actor(state)
-        if debug is not None:
-            x = [(s, p) for s, p in zip(debug, probas.tolist())]
-            # print("Probalities:")
-            sx = sorted(x, key=lambda e: e[0])
-            self.probabilities.append([b for a, b in sx])
-            # string = ""
-            # for i in range(10):
-            #     data = sx[10 * i : 10 * (i + 1)]
-            #     string += ", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)) + "\n"
-            # print(string)
+        probs, state_value = self.agent(state)
+        self.probabilities.append(probs.to("cpu").tolist())
+        m = Bernoulli(probs)
 
-        # mean = probas.mean()
-        # action = [1 if x >= mean else 0 for x in probas.tolist()]
-        # selection = sorted(list(zip(range(100), probas.tolist())), key=lambda x:x[1])[-5:]
-        # indices = [x for x, _ in selection]
-        # action = [1 if i in indices else 0 for i in range(100)]
-        p = 0
-        while p < self.minp:
-            try:
-                action = torch.bernoulli(probas).type(torch.int).tolist()
-            except:
-                print(state)
-                action = None
-            p = sum(action)
-        return action
+        action = m.sample()
+        self.saved_actions.append(SavedAction(m.log_prob(action), state_value))
 
+        return action.tolist()
+    
+    def train_agent(self):
+        eps = 1e-6
+        returns = []
+        policy_losses = []
+        value_losses = []
 
-# class Policy(nn.Module):
-#     NHIDDEN = 256
-#     def __init__(self, state_dim, action_dim, device):
-#         super(Policy, self).__init__()
-#         self.device = device
-#         self.input = nn.Linear(state_dim, self.NHIDDEN)
-#         self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-#         self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        R = 0
+        for r in self.rewards[::-1]:
+            R = r + self.gamma * R
+            returns.insert(0, R)
+        
+        returns = torch.tensor(returns)
+        returns = (returns - returns.mean()) / (returns.std() + eps)
 
-#         self.actor_output = nn.Linear(self.NHIDDEN, action_dim)
-#         self.critic_output = nn.Linear(self.NHIDDEN, 1)
+        for (log_prob, value), R in zip(self.saved_actions, returns):
+            advantage = R - value.item()
 
-#     def forward(self, x):
-#         x = x.to(self.device)
-#         x = F.relu(self.input(x))
-#         x = F.relu(self.hidden1(x))
-#         x = F.relu(self.hidden2(x))
-#         a = torch.tanh(self.actor_output(x))
-#         actor_probas = (a + 1) * 0.5
-#         critic_value = self.critic_output(x)
-#         return actor_probas, critic_value
+            # calculate actor (policy) loss 
+            policy_losses.append(-log_prob * advantage)
+
+            # calculate critic (value) loss using L1 smooth loss
+            value_losses.append(F.smooth_l1_loss(value, torch.tensor([R]).to(self.device)))
+
+        # reset gradients
+        self.optimizer.zero_grad()
+
+        # sum up all the values of policy_losses and value_losses
+        loss = torch.stack(policy_losses).sum() + torch.stack(value_losses).sum()
+
+        # perform backprop
+        loss.backward()
+        self.optimizer.step()
+
+        self.rewards.clear()
+        self.saved_actions.clear()
