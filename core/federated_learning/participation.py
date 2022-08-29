@@ -1,4 +1,4 @@
-from core.scheduler.model import ActorCritic
+from core.scheduler.model import DDPG, ReplayMemory, Transition
 from torch.distributions import Bernoulli
 from torch.nn import functional as F
 import torch
@@ -74,6 +74,7 @@ class Scheduler:
         self.participants = []
         self.batchs = MovingBatch(2, device)
         self.mean = mean
+        self.memory = ReplayMemory(50)
         self.std = std
         self.old_time = 0
         self.delta = 0
@@ -122,7 +123,7 @@ class Scheduler:
         normalized_state = self.normalize(state, old_action)
         participants = self.agent.get_action(normalized_state, debug=debug)
 
-        # # Update batch
+        # Update batch
         self.batchs.states.append(normalized_state.view(-1, self.k).sum(1))
         self.batchs.actions.append([i for i, x in enumerate(participants) if x])
         self.batchs.update_size()
@@ -144,7 +145,7 @@ class Scheduler:
         # new_state = torch.tensor(new_state).view(-1, self.k)
         # reward = -torch.max(new_state.sum(1) * action).item()
         self.rewards.append(reward)
-        self.agent.rewards.append(reward)
+        return reward
         
         # if self.batchs.isfull():
         #     states = self.batchs.states
@@ -161,13 +162,17 @@ class Scheduler:
         #     # reward = (reward / 1000).item()
         #     # print("Reward:", reward)
         #     self.rewards.append(reward)
-        #     self.agent.rewards.append(reward)
         #     # return reward
         # # else:
         #     # return None
 
     def update(self):
-        self.agent.train_agent()
+        if len(self.memory) > 10:
+            transitions = self.memory.sample(10)
+            batch = Transition(*zip(*transitions))
+
+            value_loss, policy_loss = self.agent.update_params(batch)
+
 
     def reset(self):
         with open(self.path / f"rewards-{self.i}.pkl", "wb") as file:
