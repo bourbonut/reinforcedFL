@@ -63,7 +63,7 @@ class Scheduler:
     def __init__(
         self, ninput, noutput, device, path, k=1, mean=None, std=None, **kwargs
     ):
-        self.agent = ActorCritic(ninput * k, noutput, device, lr=1e-2)
+        self.agent = DDPG(ninput * k, noutput, device)
         self.device = device
         self.rewards = []
         self.action_dim = noutput
@@ -78,6 +78,7 @@ class Scheduler:
         self.std = std
         self.old_time = 0
         self.delta = 0
+        self.losses = [0, 0]
 
     def norm(self, state, flatten=True):
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
@@ -109,6 +110,24 @@ class Scheduler:
         max_ = torch.cat([ctimes.max(0)[0].unsqueeze(0)] * times.size(0))
         return (times - min_) / (max_ - min_)
 
+    def normalize_all(self, state, flatten=True):
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        mean = torch.cat([state.mean(0).unsqueeze(0)] * state.size(0))
+        std = torch.cat([state.std(0).unsqueeze(0)] * state.size(0))
+        state = (state - mean) / std
+        return state.flatten() if flatten else state
+
+    def norml2_all(self, state, flatten=True):
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        state = state / torch.norm(state, dim=0)
+        return state.flatten() if flatten else state
+
+    def minmax_all(self, times, _):
+        times = torch.tensor(times, dtype=torch.float).view(-1, self.k)
+        min_ = torch.cat([times.min(0)[0].unsqueeze(0)] * times.size(0))
+        max_ = torch.cat([times.max(0)[0].unsqueeze(0)] * times.size(0))
+        return (times - min_) / (max_ - min_)
+
     def select_next_partipants(self, state, old_action, debug=None):
         if state == []:
             population = list(range(self.action_dim))
@@ -119,9 +138,12 @@ class Scheduler:
                 self.agent.probabilities.append(self.agent.probabilities[-1])
             else:
                 self.agent.probabilities.append([0.] * self.action_dim)
-            return [int(i in sample) for i in range(self.action_dim)]
-        normalized_state = self.normalize(state, old_action)
-        participants = self.agent.get_action(normalized_state, debug=debug)
+            return [int(i in sample) for i in range(self.action_dim)], None
+        # print(state)
+        normalized_state = self.normalize_all(state)
+        # print(normalized_state)
+        action = self.agent.get_action(normalized_state, debug=debug)
+        participants = torch.bernoulli(action).tolist()
 
         # Update batch
         self.batchs.states.append(normalized_state.view(-1, self.k).sum(1))
@@ -129,7 +151,7 @@ class Scheduler:
         self.batchs.update_size()
 
         self.participants.append(participants)
-        return participants
+        return participants, action.tolist()
 
     def grouped(self, list_):
         k = self.k
@@ -138,9 +160,9 @@ class Scheduler:
 
     def compute_reward(self, action, new_state):
         action = torch.tensor(action)
-        normalized_new_state = self.minmax(new_state, action, False)
-        time = -torch.max(normalized_new_state.sum(1) * action).item()
-        reward = (time - self.old_time) * 10
+        normalized_new_state = self.normalize_all(new_state, False)
+        time = -torch.max(normalized_new_state.mean(1) * action).item()
+        reward = (time - self.old_time)
         self.old_time = time
         # new_state = torch.tensor(new_state).view(-1, self.k)
         # reward = -torch.max(new_state.sum(1) * action).item()
@@ -170,8 +192,11 @@ class Scheduler:
         if len(self.memory) > 10:
             transitions = self.memory.sample(10)
             batch = Transition(*zip(*transitions))
-
+            
+            # if len(self.memory)>19:
+            #     print(batch)
             value_loss, policy_loss = self.agent.update_params(batch)
+            self.losses = [value_loss, policy_loss]
 
 
     def reset(self):
@@ -182,8 +207,8 @@ class Scheduler:
         self.i += 1
         self.old_time = 0
         self.delta = 0
-        # self.agent.losses[0] = 0
-        # self.agent.losses[1] = 0
+        self.losses[0] = 0
+        self.losses[1] = 0
         self.batchs.clear()
 
     def finish(self):
@@ -191,5 +216,5 @@ class Scheduler:
             pickle.dump(self.participants, file)
         with open(self.path / "probabilities.pkl", "wb") as file:
             pickle.dump(self.agent.probabilities, file)
-        torch.save(self.agent.agent.state_dict(), self.path / "actor.pt")
-        torch.save(self.agent.agent.state_dict(), self.path / "critic.pt")
+        # torch.save(self.agent.agent.state_dict(), self.path / "actor.pt")
+        # torch.save(self.agent.agent.state_dict(), self.path / "critic.pt")

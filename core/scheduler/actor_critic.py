@@ -67,7 +67,7 @@ class Critic(nn.Module):
         # self.ln2 = nn.LayerNorm(self.NHIDDEN)
 
         # Layer 3
-        self.linear3 = nn.Linear(self.NHIDDEN + num_outputs, self.NHIDDEN)
+        self.linear3 = nn.Linear(self.NHIDDEN + noutput, self.NHIDDEN)
         # self.ln3 = nn.LayerNorm(self.NHIDDEN)
 
         # Output layer (single value)

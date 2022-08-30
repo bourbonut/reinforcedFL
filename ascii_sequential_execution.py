@@ -180,11 +180,14 @@ with Live(panel, auto_refresh=False) as live:
     b = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[0][0] for worker in workers]
     c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][0] for worker in workers]
     alltimes = [statistics.mean(m) for m in zip(a, b, c)]
-    scheduler.mean = torch.tensor([[statistics.mean(x) for x in (a, b, c)]] * NWORKERS)
+    scheduler.mean = torch.tensor([[a, b, c] for a, b, c in zip(a, b, c)])
+    # scheduler.mean = torch.tensor([[statistics.mean(x) for x in (a, b, c)]] * NWORKERS)
+
     a = [worker.STD for worker in workers]
     b = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[0][1] for worker in workers]
     c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][1] for worker in workers]
-    scheduler.std = torch.tensor([[statistics.mean(x) for x in (a, b, c)]] * NWORKERS)
+    scheduler.std = torch.tensor([[a, b, c] for a, b, c in zip(a, b, c)])
+    # scheduler.std = torch.tensor([[statistics.mean(x) for x in (a, b, c)]] * NWORKERS)
     texts[-1] = Align.center("[green]Workers are successfully initialized.[/]")
     panel.renderable = Group(*texts)
     live.refresh()
@@ -228,7 +231,7 @@ for iexp in range(NEXPS):
     align = Align.center(table)
     with Live(align, auto_refresh=False, vertical_overflow="fold") as live:
         start = perf_counter()
-        selection = scheduler.select_next_partipants(state, [])
+        selection, _ = scheduler.select_next_partipants(state, [])
         old_action = copy(selection)
         indices_participants = [i for i in range(NWORKERS) if selection[i]]
         # print(f"{indices_participants = }")
@@ -270,7 +273,7 @@ for iexp in range(NEXPS):
             start = perf_counter()
 
             # Selection of future participants
-            action = selection = scheduler.select_next_partipants(
+            selection, action = scheduler.select_next_partipants(
                 state, old_action, debug=alltimes
             )
             indices_participants = [i for i in range(NWORKERS) if selection[i]]
@@ -290,8 +293,15 @@ for iexp in range(NEXPS):
 
             # print(f"Reward of round {r + 1}")
             reward = scheduler.compute_reward(selection, new_state)
+            scheduler.memory.push(
+                scheduler.normalize_all(state).tolist(),
+                action,
+                0,
+                scheduler.normalize_all(new_state).tolist(),
+                reward,
+            )
+            scheduler.update()
             old_action = list(action)
-            scheduler.memory.push(state, action, 0, new_state, reward)
 
             duration = perf_counter() - start
 
@@ -306,7 +316,7 @@ for iexp in range(NEXPS):
             table.add_row(
                 str(r + 1),
                 f"{duration:.3f} s",
-                f"{scheduler.agent.losses}",
+                f"{scheduler.losses}",
                 f"{max_time:.3f} s",
                 f"{(ratio, len(indices_participants), len(already_selected))}",
             )
@@ -316,7 +326,6 @@ for iexp in range(NEXPS):
     if break_now:
         break
 
-    scheduler.update()
     scheduler.reset()
     state.clear()
     old_action.clear()

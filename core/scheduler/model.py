@@ -21,6 +21,8 @@ class ReplayMemory(object):
         """Saves a transition."""
         if len(self.memory) < self.capacity:
             self.memory.append(None)
+        state = torch.tensor([state])
+        action = torch.tensor([action])
         done = torch.tensor([done])
         reward = torch.tensor([reward])
         next_state = torch.tensor([next_state])
@@ -50,7 +52,7 @@ class DDPG(object):
 
     def __init__(self, ninput, noutput, device):
         self.gamma = 0.99
-        self.tau = 0.05
+        self.tau = 0.01
         self.action_space = [0., 1.]
         self.device = device
 
@@ -64,20 +66,21 @@ class DDPG(object):
 
         # Define the optimizers for both networks
         self.actor_optimizer = Adam(
-            self.actor.parameters(), lr=1e-4
+            self.actor.parameters(), lr=1e-3
         )  # optimizer for the actor network
         self.critic_optimizer = Adam(
-            self.critic.parameters(), lr=1e-3, weight_decay=1e-2
+            self.critic.parameters(), lr=1e-2, weight_decay=1e-1
         )  # optimizer for the critic network
 
         # Make sure both targets are with the same weight
         hard_update(self.actor_target, self.actor)
         hard_update(self.critic_target, self.critic)
+        self.probabilities = []
 
-    def get_action(self, state, action_noise=None):
+    def get_action(self, state, action_noise=None, debug=None):
         # Get the continous action value to perform in the env
         self.actor.eval()  # Sets the actor in evaluation mode
-        mu = self.actor(x)
+        mu = self.actor(state)
         self.actor.train()  # Sets the actor in training mode
         mu = mu.data
 
@@ -87,7 +90,13 @@ class DDPG(object):
             mu += noise
 
         # Clip the output according to the action space of the env
-        mu = mu.clamp(self.action_space[0], self.action_space[0])
+        mu = mu.clamp(self.action_space[0], self.action_space[1])
+        if debug is not None:
+            x = [(s, p) for s, p in zip(debug, mu.tolist())]
+            sx = sorted(x, key=lambda e: e[0])
+            self.probabilities.append([b for a, b in sx])
+        else:
+            self.probabilities.append(mu.tolist())
 
         return mu
 
