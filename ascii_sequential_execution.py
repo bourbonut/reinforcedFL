@@ -159,11 +159,8 @@ with Live(panel, auto_refresh=False) as live:
     live.refresh()
     models = (Model(nclasses, device) for _ in range(NWORKERS))
     batch_size = parameters["model"].get("batch_size", 64)
-    with open(wk_data_path / "allpartitions.pkl", "rb") as file:
-        allpartitions = pickle.load(file)
     workers = tuple(
         worker_class(
-            *allpartitions[i],
             model.to(device),
             wk_data_path / f"worker-{i+1}.pkl",
             EPOCHS,
@@ -181,13 +178,11 @@ with Live(panel, auto_refresh=False) as live:
     c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][0] for worker in workers]
     alltimes = [statistics.mean(m) for m in zip(a, b, c)]
     scheduler.mean = torch.tensor([[a, b, c] for a, b, c in zip(a, b, c)])
-    # scheduler.mean = torch.tensor([[statistics.mean(x) for x in (a, b, c)]] * NWORKERS)
 
     a = [worker.STD for worker in workers]
     b = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[0][1] for worker in workers]
     c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][1] for worker in workers]
     scheduler.std = torch.tensor([[a, b, c] for a, b, c in zip(a, b, c)])
-    # scheduler.std = torch.tensor([[statistics.mean(x) for x in (a, b, c)]] * NWORKERS)
     texts[-1] = Align.center("[green]Workers are successfully initialized.[/]")
     panel.renderable = Group(*texts)
     live.refresh()
@@ -207,11 +202,8 @@ old_action = []
 ten_best = sorted(alltimes)[: int(len(workers) * 0.1)]
 best_indices = set([alltimes.index(i) for i in ten_best])
 sx = sorted(alltimes)
-# print(", ".join((f"{x:>8_.3f}" for x in sx)))
-# print(best_indices)
 
 break_now = False
-
 times = []
 
 # Panel
@@ -220,6 +212,8 @@ console.print(Align.center(Markdown("## Experiments\n")))
 for iexp in range(NEXPS):
     table = Table(
         "Round",
+        "Training accuracies [%]",
+        "Testing accuracies [%]",
         "Duration \[s]",
         "Losses",
         "Time (computation & communication) \[s]",
@@ -234,8 +228,19 @@ for iexp in range(NEXPS):
         selection, _ = scheduler.select_next_partipants(state, [])
         old_action = copy(selection)
         indices_participants = [i for i in range(NWORKERS) if selection[i]]
-        # print(f"{indices_participants = }")
         participants = [workers[i] for i in indices_participants]
+
+        for worker in participants:
+            worker.communicatewith(server)
+
+        train(participants)
+
+        pair = evaluate(participants, True, full=True)
+        accuracies, singular_accuracies = zip(*pair)
+        tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
+
+        for worker in participants:
+            server.communicatewith(worker)
 
         state.clear()
         for i, worker in enumerate(workers):
@@ -252,9 +257,14 @@ for iexp in range(NEXPS):
             for i, s in enumerate(state)
         ]
 
-        # print("Update state:", state)
-        # print(f"{state = }")
         server.update(indices_participants)
+
+        for worker in workers:
+            worker.communicatewith(server)
+
+        pair = evaluate(workers, full=True)
+        accuracies, singular_accuracies = zip(*pair)
+        te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
 
         duration = perf_counter() - start
 
@@ -262,6 +272,8 @@ for iexp in range(NEXPS):
         max_time = max((sel * sum(time) for sel, time in iterator))
         table.add_row(
             str(1),
+            f"{tr_avg_acc:.2%}",
+            f"{te_avg_acc:.2%}",
             f"{duration:.3f} s",
             "Random round",
             f"{max_time:.3f} s",
@@ -269,6 +281,8 @@ for iexp in range(NEXPS):
         )
         times.append(max_time)
         live.refresh()
+        global_accs.append((tr_avg_acc, te_avg_acc))
+
         for r in range(1, ROUNDS):
             start = perf_counter()
 
@@ -284,6 +298,18 @@ for iexp in range(NEXPS):
                 break_now = True
                 break
 
+            for worker in participants:
+                worker.communicatewith(server)
+
+            train(participants)
+
+            pair = evaluate(participants, True, full=True)
+            accuracies, singular_accuracies = zip(*pair)
+            tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
+
+            for worker in participants:
+                server.communicatewith(worker)
+
             new_state.clear()
             for i, worker in enumerate(workers):
                 if i in indices_participants:
@@ -291,7 +317,7 @@ for iexp in range(NEXPS):
                 else:
                     new_state.extend(state[3 * i : 3 * (i + 1)])
 
-            # print(f"Reward of round {r + 1}")
+            server.update(indices_participants)
             reward = scheduler.compute_reward(selection, new_state)
             scheduler.memory.push(
                 scheduler.normalize_all(state).tolist(),
@@ -302,6 +328,13 @@ for iexp in range(NEXPS):
             )
             scheduler.update()
             old_action = list(action)
+
+            for worker in workers:
+                worker.communicatewith(server)
+
+            pair = evaluate(workers, full=True)
+            accuracies, singular_accuracies = zip(*pair)
+            te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
 
             duration = perf_counter() - start
 
@@ -315,6 +348,8 @@ for iexp in range(NEXPS):
             # Update the table
             table.add_row(
                 str(r + 1),
+                f"{tr_avg_acc:.2%}",
+                f"{te_avg_acc:.2%}",
                 f"{duration:.3f} s",
                 f"{scheduler.losses}",
                 f"{max_time:.3f} s",
@@ -323,14 +358,28 @@ for iexp in range(NEXPS):
             times.append(max_time)
             live.refresh()
 
+            global_accs.append((tr_avg_acc, te_avg_acc))
+
     if break_now:
         break
-
+    
+    server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
+    server.global_model = Model(nclasses, device).to(device)
     scheduler.reset()
     state.clear()
     old_action.clear()
 
+    for worker in workers:
+        worker.model = Model(nclasses, device).to(device)
 
+    # Save results
+    with open(exp_path / f"global_accs-{iexp}.pkl", "wb") as file:
+        pickle.dump(global_accs, file)
+
+    global_accs.clear()
+
+
+server.finish(exp_path / "agent")
 scheduler.finish()
 with open(exp_path / "scheduler" / "times.pkl", "wb") as file:
     pickle.dump(times, file)
