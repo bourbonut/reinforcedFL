@@ -57,6 +57,7 @@ class ActorCritic:
         self.a_optim = Adam(self.actor.parameters(), lr=la)
         self.c_optim = Adam(self.critic.parameters(), lr=lc)
         self.losses = [0, 0]
+        self.probabilities= []
 
     def train_actor(self, state, action, td_error):
         probas = self.actor(state)
@@ -88,29 +89,30 @@ class ActorCritic:
     def get_action(self, state, debug=None):
         # print(state.size())
         probas = self.actor(state)
-        # if debug is not None:
-        #     x = [(s, p) for s, p in zip(debug, probas.tolist())]
-        #     print("Probalities:")
-        #     sx = sorted(x, key=lambda e: e[0])
-        #     string = ""
-        #     for i in range(10):
-        #         data = sx[10 * i : 10 * (i + 1)]
-        #         string += ", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)) + "\n"
-        #     print(string)
+        if debug is not None:
+            x = [(s, p) for s, p in zip(debug, probas.tolist())]
+            sx = sorted(x, key=lambda e: e[0])
+            self.probabilities.append([b for a, b in sx])
+            # string = ""
+            # for i in range(10):
+            #     data = sx[10 * i : 10 * (i + 1)]
+            #     string += ", ".join((f"{a:>8.3f}" + ":" + f"{b:.2%}" for a, b in data)) + "\n"
+            # print(string)
 
         # mean = probas.mean()
         # action = [1 if x >= mean else 0 for x in probas.tolist()]
         # selection = sorted(list(zip(range(100), probas.tolist())), key=lambda x:x[1])[-5:]
         # indices = [x for x, _ in selection]
         # action = [1 if i in indices else 0 for i in range(100)]
-        p = 0
-        while p < self.minp:
-            try:
-                action = torch.bernoulli(probas).type(torch.int).tolist()
-            except:
-                print(state)
-                action = None
-            p = sum(action)
+        # p = 0
+        # while p < self.minp:
+        #     try:
+        #         action = torch.bernoulli(probas).type(torch.int).tolist()
+        #     except:
+        #         print(state)
+        #         action = None
+        #     p = sum(action)
+        action = torch.bernoulli(probas).type(torch.int).tolist()
         return action
 
 

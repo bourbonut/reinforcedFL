@@ -195,9 +195,9 @@ best_indices = set([alltimes.index(i) for i in ten_best])
 sx = sorted(alltimes)
 # for i in range(2):
 #     data = sx[10 * i: 10 * (i + 1)]
-print(", ".join((f"{x:>8_.3f}" for x in sx)))
+# print(", ".join((f"{x:>8_.3f}" for x in sx)))
 # print(alltimes)
-print(best_indices)
+# print(best_indices)
 
 break_now = False
 

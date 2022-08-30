@@ -46,15 +46,37 @@ class Scheduler:
         max_ = torch.cat([ctimes.max(0)[0].unsqueeze(0)] * times.size(0))
         return (times - min_) / (max_ - min_)
 
+    def normalize_all(self, state, flatten=True):
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        mean = torch.cat([state.mean(0).unsqueeze(0)] * state.size(0))
+        std = torch.cat([state.std(0).unsqueeze(0)] * state.size(0))
+        state = (state - mean) / std
+        return state.flatten() if flatten else state
+
+    def norml2_all(self, state, flatten=True):
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        state = state / torch.norm(state, dim=0)
+        return state.flatten() if flatten else state
+
+    def minmax_all(self, times, _):
+        times = torch.tensor(times, dtype=torch.float).view(-1, self.k)
+        min_ = torch.cat([times.min(0)[0].unsqueeze(0)] * times.size(0))
+        max_ = torch.cat([times.max(0)[0].unsqueeze(0)] * times.size(0))
+        return (times - min_) / (max_ - min_)
+
     def select_next_partipants(self, state, old_action, debug=None):
         if state == []:
             population = list(range(self.action_dim))
             k = self.action_dim // 10
             sample = random.sample(population, k)
             self.participants.append([])
+            if len(self.agent.probabilities)>0:
+                self.agent.probabilities.append(self.agent.probabilities[-1])
+            else:
+                self.agent.probabilities.append([0.] * self.action_dim)
             return [int(i in sample) for i in range(self.action_dim)]
         participants = self.agent.get_action(
-            self.normalize(state, old_action), debug=debug
+            self.normalize_all(state), debug=debug
         )
         self.participants.append(participants)
         return participants
@@ -65,60 +87,17 @@ class Scheduler:
             yield list_[k * i : k * (i + 1)]
 
     def compute_reward(self, action, new_state):
-        k = sum(action)
         action = torch.tensor(action)
-        times = torch.tensor(new_state).view(-1, self.k)
-        scaled_times = self.minmax(new_state, action, False)
-        not_scaled_times = times.sum(1) * action
-        # x = scaled_times.sum(1) * action
-        # index = torch.argmax(x).item()
-        # time = times.sum(1)[index].item()
-        # reward = -exp(-torch.max(x).item() * k / 100)
-        # reward = -exp((-torch.max(x).item() - torch.min(x).item()) * k / 100)
-        # print("Delta avant:", self.delta)
-        # rt = -(torch.max(not_scaled_times).item() + torch.min(not_scaled_times).item())
-        # print("Rt:", rt)
-        # reward = rt - self.delta
-        # self.delta = self.delta + 0.9 * (reward - self.delta)
-        # print("Delta après:", self.delta)
-        # reward = torch.max(not_scaled_times).item() + torch.min(not_scaled_times).item()
-        # reward = (reward - not_scaled_times.mean()) / not_scaled_times.std() * k / 100
-
-        time_action = scaled_times.sum(1) * action
-        reward =  2 * scaled_times.sum(1).mean() - (torch.max(time_action) + torch.min(time_action))
-        # reward = reward * 2
-
-
-        # self.old_time = reward
-        # reward = -torch.mean(x).item()
-
-        # if value > self.old_time:
-        #     reward = -1
-        #     self.old_time = value
-        # elif value < self.old_time:
-        #     reward = 1
-        #     self.old_time = value
-        # else:
-        #     reward = 0
-        #     self.old_time = value
-
-        # if time > self.old_time:
-        #     reward = -1 # * k
-        #     self.old_time = time
-        # elif time < self.old_time:
-        #     reward = 1 # * k
-        #     self.old_time = time
-        # else:
-        #     reward = 0
-        #     self.old_time = time
-
-        print("Reward:", reward)
+        normalized_new_state = self.normalize_all(new_state, False)
+        time = -torch.max(normalized_new_state.mean(1) * action).item()
+        reward = (time - self.old_time)
+        self.old_time = time
         self.rewards.append(reward)
         return reward
 
     def update(self, old_action, state, action, reward, new_state):
-        normalized_state = self.normalize(state, old_action)
-        normalized_new_state = self.normalize(new_state, action)
+        normalized_state = self.normalize_all(state)
+        normalized_new_state = self.normalize_all(new_state)
         td_error = self.agent.train_critic(
             normalized_state, reward, normalized_new_state
         )
@@ -138,7 +117,7 @@ class Scheduler:
     def finish(self):
         with open(self.path / "selections.pkl", "wb") as file:
             pickle.dump(self.participants, file)
-        with open(self.path / "rewards.pkl", "wb") as file:
-            pickle.dump(self.rewards, file)
+        with open(self.path / "probabilities.pkl", "wb") as file:
+            pickle.dump(self.agent.probabilities, file)
         torch.save(self.agent.actor.state_dict(), self.path / "actor.pt")
         torch.save(self.agent.critic.state_dict(), self.path / "critic.pt")
