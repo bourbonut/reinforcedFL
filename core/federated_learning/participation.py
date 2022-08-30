@@ -73,6 +73,7 @@ class Scheduler:
         self.k = k
         self.participants = []
         self.batchs = MovingBatch(4, device)
+        self.old_time = 0
         self.mean = mean
         self.std = std
 
@@ -106,6 +107,25 @@ class Scheduler:
         max_ = torch.cat([ctimes.max(0)[0].unsqueeze(0)] * times.size(0))
         return (times - min_) / (max_ - min_)
 
+    def normalize_all(self, state, flatten=True):
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        mean = torch.cat([state.mean(0).unsqueeze(0)] * state.size(0))
+        std = torch.cat([state.std(0).unsqueeze(0)] * state.size(0))
+        state = (state - mean) / std
+        return state.flatten() if flatten else state
+
+    def norml2_all(self, state, flatten=True):
+        state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        state = state / torch.norm(state, dim=0)
+        return state.flatten() if flatten else state
+
+    def minmax_all(self, times, _):
+        times = torch.tensor(times, dtype=torch.float).view(-1, self.k)
+        min_ = torch.cat([times.min(0)[0].unsqueeze(0)] * times.size(0))
+        max_ = torch.cat([times.max(0)[0].unsqueeze(0)] * times.size(0))
+        return (times - min_) / (max_ - min_)
+
+
     def select_next_partipants(self, state, old_action, debug=None):
         if state == []:
             population = list(range(self.action_dim))
@@ -117,7 +137,7 @@ class Scheduler:
             else:
                 self.agent.probabilities.append([0.] * self.action_dim)
             return [int(i in sample) for i in range(self.action_dim)]
-        normalized_state = self.norm(state, old_action)
+        normalized_state = self.normalize_all(state)
         participants = self.agent.get_action(normalized_state, debug=debug)
 
         # Update batch
@@ -133,24 +153,16 @@ class Scheduler:
         for i in range(len(list_) // k):
             yield list_[k * i : k * (i + 1)]
 
-    def compute_reward(self, _x, _y):
-        if self.batchs.isfull():
-            states = self.batchs.states
-            actions = self.batchs.actions
-            selected = reduce(lambda x, y: x.union(y), map(set, actions))
-            action = [1 if x in selected else 0 for x in selected]
-            speed = states[-1] - states[0]
-            sign = partial(copysign, 1)
-            select = lambda x : 1 if x==1 else -1
-            rt = lambda sp, ac: ac * (sign(sp) if sp != 0 else 0) # * abs(sp)
-            iterator = zip(speed, action)
-            reward = reduce(lambda x, y: x + rt(*y), iterator, rt(*next(iterator))) / sum(action)
-            # reward = (reward / 1000).item()
-            print("Reward:", reward)
-            self.rewards.append(reward)
-            return reward
-        else:
-            return None
+    def compute_reward(self, action, new_state):
+        action = torch.tensor(action)
+        normalized_new_state = self.normalize_all(new_state, False)
+        time = -torch.max(normalized_new_state.mean(1) * action).item()
+        reward = (time - self.old_time)
+        self.old_time = time
+        # new_state = torch.tensor(new_state).view(-1, self.k)
+        # reward = -torch.max(new_state.sum(1) * action).item()
+        self.rewards.append(reward)
+        return reward
 
     def update(self, old_action, state, action, reward, new_state):
         if reward is not None:
@@ -168,7 +180,7 @@ class Scheduler:
         self.action = None
         self.i += 1
         self.old_time = 0
-        self.delta = 0
+        # self.delta = 0
         self.agent.losses[0] = 0
         self.agent.losses[1] = 0
         self.batchs.clear()
