@@ -202,6 +202,8 @@ class Scheduler:
     def reset(self):
         with open(self.path / f"rewards-{self.i}.pkl", "wb") as file:
             pickle.dump(self.rewards, file)
+        torch.save(self.agent.actor.state_dict(), self.path / f"actor-{self.i}.pt")
+        torch.save(self.agent.critic.state_dict(), self.path / f"critic-{self.i}.pt")
         self.rewards.clear()
         self.action = None
         self.i += 1
@@ -216,5 +218,5 @@ class Scheduler:
             pickle.dump(self.participants, file)
         with open(self.path / "probabilities.pkl", "wb") as file:
             pickle.dump(self.agent.probabilities, file)
-        # torch.save(self.agent.agent.state_dict(), self.path / "actor.pt")
-        # torch.save(self.agent.agent.state_dict(), self.path / "critic.pt")
+        torch.save(self.agent.actor.state_dict(), self.path / "actor.pt")
+        torch.save(self.agent.critic.state_dict(), self.path / "critic.pt")

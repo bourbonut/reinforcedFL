@@ -171,18 +171,12 @@ with Live(panel, auto_refresh=False) as live:
     server.n = [len(worker._train) for worker in workers]
     server.t = [len(worker._test) for worker in workers]
     a = [
-        worker.computation_speed * (worker.a // worker.batch_size) * worker.epochs
+        worker.computation_speed * (len(worker._train) // worker.batch_size) * worker.epochs
         for worker in workers
     ]
     b = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[0][0] for worker in workers]
     c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][0] for worker in workers]
     alltimes = [statistics.mean(m) for m in zip(a, b, c)]
-    scheduler.mean = torch.tensor([[a, b, c] for a, b, c in zip(a, b, c)])
-
-    a = [worker.STD for worker in workers]
-    b = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[0][1] for worker in workers]
-    c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][1] for worker in workers]
-    scheduler.std = torch.tensor([[a, b, c] for a, b, c in zip(a, b, c)])
     texts[-1] = Align.center("[green]Workers are successfully initialized.[/]")
     panel.renderable = Group(*texts)
     live.refresh()
