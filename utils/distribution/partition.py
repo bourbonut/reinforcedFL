@@ -34,7 +34,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
     Class for augmented dataset
     """
 
-    def __init__(self, dataset, k, noise=100):
+    def __init__(self, dataset, k, noise=1):
         """
         Return a new dataset with same distribution
         and k times the total size
@@ -92,7 +92,7 @@ def generate(
     volume_distrb="iid",
     save2png=False,
     k=None,
-    noise=10,
+    noise=1,
 ):
     """
     Generate local dataset for workers
