@@ -189,6 +189,10 @@ b = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[0][0] for worker in workers]
 c = [worker.NB_PARAMS * 1e-6 * 32 / worker.network[1][0] for worker in workers]
 alltimes = [statistics.mean(m) for m in zip(a, b, c)]
 
+ten_best = sorted(alltimes)[: int(len(workers) * 0.1)]
+best_indices = set([alltimes.index(i) for i in ten_best])
+sx = sorted(alltimes)
+
 # Create a directory
 create(exp_path / "agent", verbose=False)
 create(exp_path / "scheduler", verbose=False)
@@ -286,7 +290,7 @@ for iexp in range(NEXPS):
             already_selected.update(set(indices_participants))
 
             participants = [workers[i] for i in indices_participants]
-            if len(participants) <= 40: # 10:
+            if len(participants) <= 10: # 10:
                 break_now = True
                 break
 
@@ -354,6 +358,7 @@ for iexp in range(NEXPS):
                 f"{(ratio, len(indices_participants), len(already_selected))}",
             )
             live.refresh()
+            times.append(max_time)
 
             # Update global_accs
             global_accs.append((tr_avg_acc, te_avg_acc))
@@ -390,6 +395,14 @@ scheduler.finish()
 
 # Evaluation
 scheduler.agent.set_eval()
+
+global_accs = []
+state = []
+new_state = []
+old_action = []
+
+break_now = False
+times = []
 
 # Main loop
 for iexp in range(NEXPS):
@@ -456,7 +469,7 @@ for iexp in range(NEXPS):
         
         # for r in range(1, ROUNDS):
         r = 1
-        while te_avg_acc < 0.50: # 0.95:
+        while te_avg_acc < 0.95: # 0.95:
             start = perf_counter()
 
             # Selection of future participants
@@ -517,6 +530,7 @@ for iexp in range(NEXPS):
                 f"{max_time:.3f} s",
             )
             live.refresh()
+            times.append(max_time)
 
             # Update global_accs
             global_accs.append((tr_avg_acc, te_avg_acc))
@@ -550,6 +564,14 @@ for worker in workers:
 # =======================================================================================================
 
 # Federated Averaging
+
+global_accs = []
+state = []
+new_state = []
+old_action = []
+
+break_now = False
+times = []
 
 # Main loop
 for iexp in range(NEXPS):
@@ -618,7 +640,7 @@ for iexp in range(NEXPS):
         
         # for r in range(1, ROUNDS):
         r = 1
-        while te_avg_acc < 0.50: # 0.95:
+        while te_avg_acc < 0.95: # 0.95:
             start = perf_counter()
 
             # Selection of future participants
@@ -686,6 +708,7 @@ for iexp in range(NEXPS):
                 f"{max_time:.3f} s",
             )
             live.refresh()
+            times.append(max_time)
 
             # Update global_accs
             global_accs.append((tr_avg_acc, te_avg_acc))

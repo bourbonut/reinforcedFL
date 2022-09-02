@@ -220,9 +220,10 @@ class Scheduler:
         self.batchs.clear()
 
     def finish(self):
-        with open(self.path / f"selections{uuid.uuid4().hex}.pkl", "wb") as file:
+        idd = uuid.uuid4().hex # id
+        with open(self.path / f"selections{idd}.pkl", "wb") as file:
             pickle.dump(self.participants, file)
-        with open(self.path / f"probabilities{uuid.uuid4().hex}.pkl", "wb") as file:
+        with open(self.path / f"probabilities{idd}.pkl", "wb") as file:
             pickle.dump(self.agent.probabilities, file)
         torch.save(self.agent.actor.state_dict(), self.path / "actor.pt")
         torch.save(self.agent.critic.state_dict(), self.path / "critic.pt")
