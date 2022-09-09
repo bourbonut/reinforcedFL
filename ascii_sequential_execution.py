@@ -14,7 +14,7 @@ from rich.panel import Panel
 from pathlib import Path
 from time import perf_counter
 import random
-from copy import copy
+from copy import copy, deepcopy
 import statistics
 from pathlib import Path
 
@@ -237,13 +237,14 @@ for iexp in range(NEXPS):
         indices_participants = [i for i in range(len(workers)) if selection[i]]
         participants = [workers[i] for i in indices_participants]
 
-        for worker in participants:
-            worker.communicatewith(server)
+        # for worker in participants:
+        #     worker.communicatewith(server)
 
-        train(participants)
-        pair = evaluate(participants, True, full=True)
-        accuracies, _ = zip(*pair)
-        tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
+        # train(participants)
+        # pair = evaluate(participants, True, full=True)
+        # accuracies, _ = zip(*pair)
+        # tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
+        tr_avg_acc = 0
 
         for worker in participants:
             server.communicatewith(worker)
@@ -260,12 +261,13 @@ for iexp in range(NEXPS):
 
         server.update(indices_participants)
 
-        for worker in workers:
-            worker.communicatewith(server)
+        # for worker in workers:
+        #     worker.communicatewith(server)
 
-        pair = evaluate(workers, full=True)
-        accuracies, _ = zip(*pair)
-        te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
+        # pair = evaluate(workers, full=True)
+        # accuracies, _ = zip(*pair)
+        # te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
+        te_avg_acc = 0
         duration = perf_counter() - start
 
         max_time = max((sel * sum(time) for sel, time in zip(selection, scheduler.grouped(state))))
@@ -295,22 +297,23 @@ for iexp in range(NEXPS):
                 break
 
             # Workers download the global model
-            for worker in participants:
-                worker.communicatewith(server)
+            # for worker in participants:
+            #     worker.communicatewith(server)
 
-            # Training loop of workers
-            train(participants)
+            # # Training loop of workers
+            # train(participants)
 
-            # Workers evaluate accuracy of global model
-            # on their local training data
-            pair = evaluate(participants, True, full=True)
-            accuracies, _ = zip(*pair)
-            tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
+            # # Workers evaluate accuracy of global model
+            # # on their local training data
+            # pair = evaluate(participants, True, full=True)
+            # accuracies, _ = zip(*pair)
+            # tr_avg_acc = server.compute_glb_acc(accuracies, indices_participants, True)
+            tr_avg_acc = 0
             # server.collects_training_accuracies(singular_accuracies)
 
-            # Server downloads all local updates
-            for worker in participants:
-                server.communicatewith(worker)
+            # # Server downloads all local updates
+            # for worker in participants:
+            #     server.communicatewith(worker)
 
             new_state.clear()
             for i, worker in enumerate(workers):
@@ -319,7 +322,7 @@ for iexp in range(NEXPS):
                 else:
                     new_state.extend(state[3 * i: 3 * (i + 1)])
 
-            server.update(indices_participants)
+            # server.update(indices_participants)
             reward = scheduler.compute_reward(selection, new_state)
             scheduler.memory.push(
                     scheduler.normalize_all(state).tolist(),
@@ -331,18 +334,19 @@ for iexp in range(NEXPS):
             scheduler.update()
             old_action = list(action)
 
-            for worker in workers:
-                worker.communicatewith(server)
+            # for worker in workers:
+            #     worker.communicatewith(server)
 
-            # Workers evaluate accuracy of the global model
-            # on their local testing data
-            pair = evaluate(workers, full=True)
-            accuracies, _ = zip(*pair)
-            te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
+            # # Workers evaluate accuracy of the global model
+            # # on their local testing data
+            # pair = evaluate(workers, full=True)
+            # accuracies, _ = zip(*pair)
+            # te_avg_acc = server.compute_glb_acc(accuracies, list(range(len(workers))))
+            te_avg_acc = 0
             duration = perf_counter() - start
 
-            #print(f"{list(scheduler.grouped(new_state)) = }")
-            #max_time = max((sum(time) for time in scheduler.grouped(new_state)))
+            # print(f"{list(scheduler.grouped(new_state)) = }")
+            # max_time = max((sum(time) for time in scheduler.grouped(new_state)))
             iterator = zip(selection, scheduler.grouped(new_state))
             max_time = max((sel * sum(time) for sel, time in iterator))
             state = copy(new_state)
@@ -365,19 +369,19 @@ for iexp in range(NEXPS):
             r += 1
 
     # Reset the server
-    server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
-    server.global_model = Model(nclasses, device).to(device)
+    # server.reset(exp_path / "agent" / f"loss-rl-{iexp}.png")
+    # server.global_model = Model(nclasses, device).to(device)
     scheduler.reset()
     state.clear()
     old_action.clear()
 
     # Reset workers
-    for worker in workers:
-       worker.model = Model(nclasses, device).to(device)
+    # for worker in workers:
+    #    worker.model = Model(nclasses, device).to(device)
 
     # Save results
-    with open(exp_path / f"global_accs-training-{iexp}.pkl", "wb") as file:
-        pickle.dump(global_accs, file)
+    # with open(exp_path / f"global_accs-training-{iexp}.pkl", "wb") as file:
+    #     pickle.dump(global_accs, file)
 
     with open(exp_path / f"times-training-{iexp}.pkl", "wb") as file:
         pickle.dump(times, file)
@@ -403,6 +407,8 @@ old_action = []
 
 break_now = False
 times = []
+
+static_times = [[worker.compute_times() for worker in workers] for _ in range(50)]
 
 # Main loop
 for iexp in range(NEXPS):
@@ -435,10 +441,11 @@ for iexp in range(NEXPS):
         for worker in participants:
             server.communicatewith(worker)
 
+        local_times = static_times[0]
         state.clear()
         for i, worker in enumerate(workers):
             if i in indices_participants:
-                state.extend(worker.compute_times())
+                state.extend(local_times[i])
             else:
                 state.extend([0.0, 0.0, 0.0])
 
@@ -502,10 +509,11 @@ for iexp in range(NEXPS):
 
             server.update(indices_participants)
 
+            local_times = static_times[r]
             new_state.clear()
             for i, worker in enumerate(workers):
                 if i in indices_participants:
-                    new_state.extend(worker.compute_times())
+                    new_state.extend(local_times[i])
                 else:
                     new_state.extend(state[3 * i: 3 * (i + 1)])
 
@@ -606,10 +614,11 @@ for iexp in range(NEXPS):
         for worker in participants:
             server.communicatewith(worker)
 
+        local_times = static_times[0]
         state.clear()
         for i, worker in enumerate(workers):
             if i in indices_participants:
-                state.extend(worker.compute_times())
+                state.extend(local_times[0])
             else:
                 state.extend([0.0, 0.0, 0.0])
 
@@ -675,10 +684,11 @@ for iexp in range(NEXPS):
 
             server.update(indices_participants)
 
+            local_times = static_times[r]
             new_state.clear()
             for i, worker in enumerate(workers):
                 if i in indices_participants:
-                    new_state.extend(worker.compute_times())
+                    new_state.extend(local_times[i])
                 else:
                     new_state.extend(state[3 * i: 3 * (i + 1)])
 
