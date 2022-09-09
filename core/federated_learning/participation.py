@@ -137,14 +137,14 @@ class Scheduler:
     def select_next_partipants(self, state, old_action, debug=None):
         if state == []:
             population = list(range(self.action_dim))
-            k = self.action_dim // 10
+            k = int(self.action_dim * 0.1)
             sample = random.sample(population, k)
             self.participants.append([])
             if len(self.agent.probabilities)>0:
                 self.agent.probabilities.append(self.agent.probabilities[-1])
             else:
                 self.agent.probabilities.append([0.] * self.action_dim)
-            return [int(i in sample) for i in range(self.action_dim)], None
+            return [1 if i in sample else 0 for i in range(self.action_dim)], None
         # print(state)
         normalized_state = self.normalize_all(state)
         # print(normalized_state)

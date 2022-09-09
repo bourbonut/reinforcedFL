@@ -292,7 +292,7 @@ for iexp in range(NEXPS):
             already_selected.update(set(indices_participants))
 
             participants = [workers[i] for i in indices_participants]
-            if len(participants) <= 10: # 10:
+            if len(participants) <= 8: # 10:
                 break_now = True
                 break
 
@@ -442,6 +442,9 @@ for iexp in range(NEXPS):
             server.communicatewith(worker)
 
         local_times = static_times[0]
+        l = [sum(x) for x in local_times]
+        print(sorted(l))
+        print(sorted([l[i] for i in indices_participants]))
         state.clear()
         for i, worker in enumerate(workers):
             if i in indices_participants:
@@ -510,6 +513,9 @@ for iexp in range(NEXPS):
             server.update(indices_participants)
 
             local_times = static_times[r]
+            l = [sum(x) for x in local_times]
+            print(sorted(l))
+            print(sorted([l[i] for i in indices_participants]))
             new_state.clear()
             for i, worker in enumerate(workers):
                 if i in indices_participants:
@@ -615,10 +621,13 @@ for iexp in range(NEXPS):
             server.communicatewith(worker)
 
         local_times = static_times[0]
+        l = [sum(x) for x in local_times]
+        print(sorted(l))
+        print(sorted([l[i] for i in indices_participants]))
         state.clear()
         for i, worker in enumerate(workers):
             if i in indices_participants:
-                state.extend(local_times[0])
+                state.extend(local_times[i])
             else:
                 state.extend([0.0, 0.0, 0.0])
 
@@ -685,6 +694,9 @@ for iexp in range(NEXPS):
             server.update(indices_participants)
 
             local_times = static_times[r]
+            l = [sum(x) for x in local_times]
+            print(sorted(l))
+            print(sorted([l[i] for i in indices_participants]))
             new_state.clear()
             for i, worker in enumerate(workers):
                 if i in indices_participants:
