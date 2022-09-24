@@ -123,6 +123,7 @@ class EvaluatorV2(EvaluatorServer):
     ):
         # Global accuracies : first list for training
         # second list for testing
+        self.path = path
         global_accs = []  # Main loop
         for iexp in range(nexp):
             table = Table(

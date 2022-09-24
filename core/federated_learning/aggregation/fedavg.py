@@ -1,9 +1,12 @@
+from pygal.util import compute_logarithmic_scale
+from torch import rand
+from torch.utils.data import communication
 from core.federated_learning.aggregation.base import BaseServer
 from rich.table import Table
 from rich.align import Align
 from rich.live import Live
 from time import perf_counter
-import pickle
+import pickle, statistics
 
 
 class FederatedAveraging(BaseServer):
@@ -28,6 +31,8 @@ class FederatedAveraging(BaseServer):
         super(FederatedAveraging, self).__init__(
             global_model, size_traindata, size_testdata
         )
+        self.probabilities = []
+        self.times = []  # used for tracking selection
 
     def communicatewith(self, worker):
         """
@@ -50,7 +55,39 @@ class FederatedAveraging(BaseServer):
             target_param.data.copy_(param.data)
         self.participants_updates.clear()
 
-# TODO : make one loop without first round
+    def _update_times(self, workers):
+        """
+        Return the indices of workers with the lowest times
+        """
+        self.nworkers = len(workers)
+        computation_times = [
+            w.computation_speed * (len(w._train) // w.batch_size) * w.epochs
+            for w in workers
+        ]
+        download_times = [w.NB_PARAMS * 1e-6 * 32 / w.network[0][0] for w in workers]
+        upload_times = [w.NB_PARAMS * 1e-6 * 32 / w.network[1][0] for w in workers]
+        z = zip(computation_times, download_times, upload_times)
+        self.times = [statistics.mean(m) for m in z]
+
+    def _update_probabilities(self, probabilities, random_round=False):
+        """
+        Update the list of participants in order to visualize
+        the selection of the experiment
+        """
+        if len(probabilities) == 0:
+            self.probabilities.append([0.0] * self.nworkers)
+        elif random_round:
+            self.probabilities.append(self.probabilities[-1])
+        else:
+            x = [(i, p) for i, p in zip(self.times, probabilities)]
+            self.probabilities.append([e for _, e in sorted(x, key=lambda e: e[0])])
+
+    def finish(self):
+        path = self.path / "scheduler"
+        with open(path / "probabilities.pkl", "wb") as file:
+            pickle.dump(self.probabilities, file)
+
+    # TODO : make one loop without first round
     def execute(
         self,
         nexp,
@@ -67,7 +104,9 @@ class FederatedAveraging(BaseServer):
     ):
         # Global accuracies : first list for training
         # second list for testing
+        self.path = path
         global_accs = []
+        self._update_times(workers)
         for iexp in range(nexp):
             table = Table(
                 "Round",
@@ -84,7 +123,7 @@ class FederatedAveraging(BaseServer):
                 # First round
                 start = perf_counter()
                 # Selection of future participants
-                selection, indices_participants = scheduler.select_next_partipants()
+                action, indices_participants = scheduler.select_next_partipants()
                 participants = [workers[i] for i in indices_participants]
                 for worker in participants:
                     worker.communicatewith(self)
@@ -109,7 +148,7 @@ class FederatedAveraging(BaseServer):
                 te_avg_acc = self.compute_glb_acc(accuracies, list(range(len(workers))))
                 duration = perf_counter() - start
 
-                max_time = scheduler.max_time(selection, False)
+                max_time = scheduler.max_time(action, False)
                 table.add_row(
                     str(1),
                     f"{tr_avg_acc:.2%}",
@@ -124,7 +163,7 @@ class FederatedAveraging(BaseServer):
                     start = perf_counter()
 
                     # Selection of future participants
-                    selection, indices_participants = scheduler.select_next_partipants()
+                    action, indices_participants = scheduler.select_next_partipants()
                     participants = [workers[i] for i in indices_participants]
 
                     # Workers download the global model
@@ -148,7 +187,7 @@ class FederatedAveraging(BaseServer):
                     scheduler.update_new_state(workers, indices_participants)
 
                     self.update(indices_participants)
-                    scheduler.update(selection)
+                    scheduler.update(action)
 
                     for worker in workers:
                         worker.communicatewith(self)
@@ -162,7 +201,7 @@ class FederatedAveraging(BaseServer):
                     )
                     duration = perf_counter() - start
 
-                    max_time = scheduler.max_time(selection, True)
+                    max_time = scheduler.max_time(action, True)
                     scheduler.copy_state()
 
                     # Update the table
@@ -193,3 +232,4 @@ class FederatedAveraging(BaseServer):
                     pickle.dump(global_accs, file)
 
                 global_accs.clear()
+        scheduler.finish()

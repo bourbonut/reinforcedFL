@@ -113,6 +113,7 @@ class EvaluatorV1(EvaluatorServer):
     def execute(
         self, nexp, rounds, workers, train, evaluate, path, model, *args, **kwargs
     ):
+        self.path = path
         # Global accuracies : first list for training
         # second list for testing
         global_accs = []

@@ -1,8 +1,9 @@
-from core.scheduler.model import ActorCritic
+from core.scheduler.model import DDPG, ReplayMemory, Transition
 from math import log
 from copy import copy
 from itertools import compress
 import random, pickle, torch
+
 
 class BaseScheduler:
     def __init__(self, size, ratio=1):
@@ -14,6 +15,9 @@ class BaseScheduler:
 
     def normalize(self, state, flatten=True):
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
+        mean = torch.cat([state.mean(0).unsqueeze(0)] * state.size(0))
+        std = torch.cat([state.std(0).unsqueeze(0)] * state.size(0))
+        state = (state - mean) / std 
         state = state / torch.norm(state, dim=0)
         return state.flatten() if flatten else state
 
@@ -38,7 +42,7 @@ class BaseScheduler:
                 self.new_state.extend(worker.compute_times())
             else:
                 self.new_state.extend(self.state[3 * i : 3 * (i + 1)])
-    
+
     def max_time(self, selection, new=True):
         return max(compress(map(sum, self.grouped(new)), selection))
 
@@ -51,50 +55,63 @@ class BaseScheduler:
     def reset(self, *args, **kwargs):
         pass
 
+    def finish(self, *args, **kwargs):
+        pass
+
 
 class Scheduler(BaseScheduler):
 
     K = 3
-    PORTION = 10
+    PORTION = 0.1
 
     def __init__(self, size, device, path, **kwargs):
         super(Scheduler, self).__init__(size, self.K)
-        self.agent = ActorCritic(size * self.K, size, device, la=1e-3, lc=1e-2)
+        self.agent = DDPG(size * self.K, size, device)
         self.device = device
         self.rewards = []
         self.path = path
-        self.i = 0
+        self.memory = ReplayMemory(50)
         self.state = []
         self.new_state = []
+        self.participants = []
         self.loss = 0
+        self.i = 0
+        self.old_time = 0
 
     def select_next_partipants(self):
         if self.state == []:
             population = list(range(self.size))
-            k = self.size // self.PORTION
+            k = int(self.size * self.PORTION)
             sample = random.sample(population, k)
-            selection = [int(i in sample) for i in range(self.size)]
+            action = None
+            participants = [int(i in sample) for i in range(self.size)]
+            self.participants.append([])
         else:
-            selection = self.agent.get_action(self.normalize(self.state))
-        indices = [i for i in range(len(self.size)) if selection[i]]
-        return selection, indices
+            action = self.agent.get_action(self.normalize(self.state))
+            participants = torch.bernoulli(action).tolist()
+            self.participants.append(participants)
+        indices = [i for i in range(len(self.size)) if participants[i]]
+        return action, indices
 
     def compute_reward(self, action):
         action = torch.tensor(action)
-        normalized_state = self.normalize(self.new_state, False)
-        reward = torch.max(normalized_state.sum(1) * action).item()
+        new_state = self.normalize(self.new_state, False)
+        time = -torch.max(new_state.mean(1) * action).item()
+        reward = time - self.old_time
+        self.old_time = time
         self.rewards.append(reward)
         return reward
 
     def update(self, action):
         reward = self.compute_reward(action)
-        normalized_state = self.normalize(self.state)
-        normalized_new_state = self.normalize(self.new_state)
-        td_error = self.agent.train_critic(
-            normalized_state, reward, normalized_new_state
-        )
-        self.agent.train_actor(normalized_state, action, td_error)
-        self.loss = self.agent.losses
+        state = self.normalize(self.state)
+        new_state = self.normalize(self.new_state)
+        self.memory.push(state, action, 0, new_state, reward)
+        if len(self.memory) > 10:
+            transitions = self.memory.sample(10)
+            batch = Transition(*zip(*transitions))
+            value_loss, policy_loss = self.agent.update_params(batch)
+            self.loss = [value_loss, policy_loss]
 
     def reset(self):
         with open(self.path / f"rewards-{self.i}.pkl", "wb") as file:
@@ -102,10 +119,16 @@ class Scheduler(BaseScheduler):
         self.rewards.clear()
         self.action = None
         self.i += 1
-        self.agent.losses[0] = 0
-        self.agent.losses[1] = 0
+        self.loss = []
+        self.old_time = 0
         self.state.clear()
         self.new_state.clear()
+
+    def finish(self):
+        with open(self.path / "selections.pkl", "wb") as file:
+            pickle.dump(self.participants, file)
+        torch.save(self.agent.actor.state_dict(), self.path / "actor.pt")
+        torch.save(self.agent.critic.state_dict(), self.path / "critic.pt")
 
 
 class RandomScheduler(BaseScheduler):
@@ -122,6 +145,7 @@ class RandomScheduler(BaseScheduler):
         selection = [int(i in sample) for i in range(self.size)]
         indices = [i for i in range(self.size) if selection[i]]
         return selection, indices
+
 
 class FullScheduler(BaseScheduler):
     def __init__(self, size, ratio=1, *args, **kwargs):

@@ -1,5 +1,5 @@
 from torch.utils.data import DataLoader
-from torch import optim, nn
+from torch import optim, nn, rand
 import pickle, torch, statistics
 from utils.plot import lineXY
 import random
@@ -14,8 +14,9 @@ class Worker:
     """
 
     GROUPS = [0.5, 0.7, 1]  # second / batch
+    STD = 0.02
     BANDWIDTHS = (((30, 5), (8, 2)), ((5, 1), (0.5, 0.2)))
-    NB_PARAMS = 1199882 # number of parameters
+    NB_PARAMS = 1199882  # number of parameters
 
     def __init__(
         self,
@@ -33,13 +34,14 @@ class Worker:
         self.toloader = lambda data: DataLoader(
             data, batch_size=batch_size, num_workers=1
         )
-        self.speed = self.GROUPS[random.choice(range(len(self.GROUPS)))]
+        self.computation_speed = self.GROUPS[random.choice(range(len(self.GROUPS)))]
+        self.speed = lambda: abs(random.normalvariate(self.computation_speed, self.STD))
         self.network = random.choice(self.BANDWIDTHS)
-        self.bandwidth_download = random.normalvariate(
-            self.network[0][0], self.network[0][1]
+        self.bandwidth_download = lambda: abs(
+            random.normalvariate(self.network[0][0], self.network[0][1])
         )
-        self.bandwidth_upload = random.normalvariate(
-            self.network[1][0], self.network[1][1]
+        self.bandwidth_upload = lambda: abs(
+            random.normalvariate(self.network[1][0], self.network[1][1])
         )
         self.model = model
         self.device = self.model.device
@@ -74,9 +76,9 @@ class Worker:
 
     def compute_times(self):
         return [
-            self.speed * (len(self._train) // self.batch_size) * self.epochs,
-            self.NB_PARAMS * 1e-6 * 32 / self.bandwidth_upload,
-            self.NB_PARAMS * 1e-6 * 32 / self.bandwidth_download,
+            self.speed() * (len(self._train) // self.batch_size) * self.epochs,
+            self.NB_PARAMS * 1e-6 * 32 / self.bandwidth_upload(),
+            self.NB_PARAMS * 1e-6 * 32 / self.bandwidth_download(),
         ]
 
     def train(self, filename=None):

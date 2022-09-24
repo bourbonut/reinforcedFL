@@ -1,106 +1,155 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch import tensor
 from torch.optim import Adam
-from torch.distributions import Bernoulli
+from core.scheduler.actor_critic import Actor, Critic
+from collections import namedtuple
+import random
+
+Transition = namedtuple(
+    "Transition", ("state", "action", "done", "next_state", "reward")
+)
 
 
-class Actor(nn.Module):
+class ReplayMemory(object):
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.memory = []
+        self.position = 0
+
+    def push(self, state, action, done, next_state, reward):
+        """Saves a transition."""
+        if len(self.memory) < self.capacity:
+            self.memory.append(None)
+        state = torch.tensor([state])
+        action = torch.tensor([action])
+        done = torch.tensor([done])
+        reward = torch.tensor([reward])
+        next_state = torch.tensor([next_state])
+        self.memory[self.position] = Transition(state, action, done, next_state, reward)
+        self.position = (self.position + 1) % self.capacity
+
+    def sample(self, batch_size):
+        return random.sample(self.memory, batch_size)
+
+    def __len__(self):
+        return len(self.memory)
+
+
+def soft_update(target, source, tau):
+    for target_param, param in zip(target.parameters(), source.parameters()):
+        target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
+
+
+def hard_update(target, source):
+    for target_param, param in zip(target.parameters(), source.parameters()):
+        target_param.data.copy_(param.data)
+
+
+class DDPG(object):
+
     NHIDDEN = 128
 
-    def __init__(self, state_dim, action_num, device):
-        super(Actor, self).__init__()
-        self.input = nn.Linear(state_dim, self.NHIDDEN)
-        self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.output = nn.Linear(self.NHIDDEN, action_num)
-        self.device = device
-
-    def forward(self, x):
-        x = x.to(self.device)
-        x = torch.tanh(self.input(x))
-        x = torch.tanh(self.hidden1(x))
-        x = torch.tanh(self.hidden2(x))
-        return (torch.tanh(self.output(x)) + 1) * 0.5
-
-
-class Critic(nn.Module):
-    NHIDDEN = 128
-
-    def __init__(self, state_dim, device):
-        super(Critic, self).__init__()
-        self.input = nn.Linear(state_dim, self.NHIDDEN)
-        self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-        self.output = nn.Linear(self.NHIDDEN, 1)
-        self.device = device
-
-    def forward(self, x):
-        x = x.to(self.device)
-        x = torch.tanh(self.input(x))
-        x = torch.tanh(self.hidden1(x))
-        x = torch.tanh(self.hidden2(x))
-        return self.output(x)
-
-
-class ActorCritic:
-    def __init__(self, ninput, noutput, device, la=1e-3, lc=1e-2):
-        self.device = device
+    def __init__(self, ninput, noutput, device):
         self.gamma = 0.99
+        self.tau = 0.01
+        self.action_space = [0., 1.]
+        self.device = device
+
+        # Define the actor
         self.actor = Actor(ninput, noutput, device).to(device)
-        self.critic = Critic(ninput, device).to(device)
+        self.actor_target = Actor(ninput, noutput, device).to(device)
 
-        self.a_optim = Adam(self.actor.parameters(), lr=la)
-        self.c_optim = Adam(self.critic.parameters(), lr=lc)
-        self.losses = [0, 0]
+        # Define the critic
+        self.critic = Critic(ninput, noutput, device).to(device)
+        self.critic_target = Critic(ninput, noutput, device).to(device)
 
-    def train_actor(self, state, action, td_error):
-        probas = self.actor(state)
-        action = torch.bernoulli(probas)
-        logprob = torch.log(probas) * action
-        #logprob = torch.gather(torch.log(probas), 1, action.T)
-        loss = -logprob.sum() * td_error
-        self.losses[1] = loss.item()
+        # Define the optimizers for both networks
+        self.actor_optimizer = Adam(
+            self.actor.parameters(), lr=1e-3
+        )  # optimizer for the actor network
+        self.critic_optimizer = Adam(
+            self.critic.parameters(), lr=1e-2, weight_decay=1e-1
+        )  # optimizer for the critic network
 
-        self.a_optim.zero_grad()
-        loss.backward()
-        self.a_optim.step()
+        # Make sure both targets are with the same weight
+        hard_update(self.actor_target, self.actor)
+        hard_update(self.critic_target, self.critic)
 
-    def train_critic(self, state, reward, state_):
-        v_ = self.critic(state_)
-        v = self.critic(state)
-        td_error = reward + self.gamma * v_ - v
-        loss = torch.square(td_error)
-        self.losses[0] = loss.item()
+    def get_action(self, state, action_noise=None):
+        # Get the continous action value to perform in the env
+        self.actor.eval()  # Sets the actor in evaluation mode
+        mu = self.actor(state)
+        self.actor.train()  # Sets the actor in training mode
+        mu = mu.data
 
-        self.c_optim.zero_grad()
-        loss.backward()
-        self.c_optim.step()
-        return td_error.detach()
+        # During training we add noise for exploration
+        if action_noise is not None:
+            noise = torch.Tensor(action_noise.noise()).to(self.device)
+            mu += noise
 
-    def get_action(self, state):
-        return torch.bernoulli(self.actor(state)).type(torch.int).tolist()
+        # Clip the output according to the action space of the env
+        mu = mu.clamp(self.action_space[0], self.action_space[1])
+        return mu
 
+    def update_params(self, batch):
+        # Get tensors from the batch
+        state_batch = torch.cat(batch.state).to(self.device)
+        action_batch = torch.cat(batch.action).to(self.device)
+        reward_batch = torch.cat(batch.reward).to(self.device)
+        done_batch = torch.cat(batch.done).to(self.device)
+        next_state_batch = torch.cat(batch.next_state).to(self.device)
 
-# class Policy(nn.Module):
-#     NHIDDEN = 128
-#     def __init__(self, state_dim, action_dim, device):
-#         super(Policy, self).__init__()
-#         self.device = device
-#         self.input = nn.Linear(state_dim, self.NHIDDEN)
-#         self.hidden1 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
-#         self.hidden2 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
+        # Get the actions and the state values to compute the targets
+        next_action_batch = self.actor_target(next_state_batch)
+        next_state_action_values = self.critic_target(
+            next_state_batch, next_action_batch.detach()
+        )
 
-#         self.actor_output = nn.Linear(self.NHIDDEN, action_dim)
-#         self.critic_output = nn.Linear(self.NHIDDEN, 1)
+        # Compute the target
+        reward_batch = reward_batch.unsqueeze(1)
+        done_batch = done_batch.unsqueeze(1)
+        expected_values = (
+            reward_batch + (1.0 - done_batch) * self.gamma * next_state_action_values
+        )
 
-#     def forward(self, x):
-#         x = x.to(self.device)
-#         x = F.relu(self.input(x))
-#         x = F.relu(self.hidden1(x))
-#         x = F.relu(self.hidden2(x))
-#         a = torch.tanh(self.actor_output(x))
-#         actor_probas = (a + 1) * 0.5
-#         critic_value = self.critic_output(x)
-#         return actor_probas, critic_value
+        # TODO: Clipping the expected values here?
+        # expected_value = torch.clamp(expected_value, min_value, max_value)
+
+        # Update the critic network
+        self.critic_optimizer.zero_grad()
+        state_action_batch = self.critic(state_batch, action_batch)
+        value_loss = F.mse_loss(state_action_batch, expected_values.detach())
+        value_loss.backward()
+        self.critic_optimizer.step()
+
+        # Update the actor network
+        self.actor_optimizer.zero_grad()
+        policy_loss = -self.critic(state_batch, self.actor(state_batch))
+        policy_loss = policy_loss.mean()
+        policy_loss.backward()
+        self.actor_optimizer.step()
+
+        # Update the target networks
+        soft_update(self.actor_target, self.actor, self.tau)
+        soft_update(self.critic_target, self.critic, self.tau)
+
+        return value_loss.item(), policy_loss.item()
+
+    def set_eval(self):
+        """
+        Sets the model in evaluation mode
+        """
+        self.actor.eval()
+        self.critic.eval()
+        self.actor_target.eval()
+        self.critic_target.eval()
+
+    def set_train(self):
+        """
+        Sets the model in training mode
+        """
+        self.actor.train()
+        self.critic.train()
+        self.actor_target.train()
+        self.critic_target.train()

@@ -189,5 +189,5 @@ server.execute(
     scheduler,
 )
 
-server.finish(exp_path / "agent")
+server.finish()
 console.print("Finished.")

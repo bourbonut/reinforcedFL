@@ -82,6 +82,7 @@ class BaseServer:
         self.participants_updates = []
         self.n = size_traindata  # list
         self.t = size_testdata  # list
+        self.path = None
 
     def send(self):
         """
@@ -278,10 +279,11 @@ class EvaluatorServer(BaseServer):
                 pickle.dump(self.losses, file)
         self.losses.clear()
 
-    def finish(self, path):
+    def finish(self):
         """
         Save results at the end of the training for the agent
         """
+        path = self.path / "agent"
         filename = path / "rl_rewards.png"
         attrbs = {"title": "Evolution of reward function"}
         attrbs.update({"xrange": (0, len(self.tracking_rewards) - 1)})
