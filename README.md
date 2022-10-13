@@ -128,6 +128,8 @@ The ![report](./docs/report.pdf) summarizes :
 3. Results of several experiments
 
 <p align="center">
-  <img width=300px src="./docs/report.png"/>
+    <a href="./docs/report.pdf">
+        <img width=300px src="./docs/report.png"/>
+    </a>
 </p>
 
