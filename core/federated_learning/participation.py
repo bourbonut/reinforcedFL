@@ -2,7 +2,7 @@ from core.scheduler.model import DDPG, ReplayMemory, Transition
 from math import log
 from copy import copy
 from itertools import compress
-import random, pickle, torch
+import random, pickle, torch, statistics
 
 
 class BaseScheduler:
@@ -34,6 +34,10 @@ class BaseScheduler:
                 self.state.extend(worker.compute_times())
             else:
                 self.state.extend([0.0, 0.0, 0.0])
+
+        # Note here, this is an approximation of the mean of each time
+        means = [statistics.mean(filter(lambda x: x!=0., self.state[i::3])) for i in range(3)]
+        self.state = [(random.random() * 0.2 + 0.9) * means[i%3] if s==0. else s for i, s in enumerate(self.state)]
 
     def update_new_state(self, workers, indices):
         self.new_state.clear()
