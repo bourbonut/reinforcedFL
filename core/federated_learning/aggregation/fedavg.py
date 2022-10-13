@@ -154,7 +154,7 @@ class FederatedAveraging(BaseServer):
                     f"{tr_avg_acc:.2%}",
                     f"{te_avg_acc:.2%}",
                     f"{duration:.3f} s",
-                    f"{0}",
+                    f"No loss",
                     f"{max_time:.3f} s",
                 )
                 live.refresh()

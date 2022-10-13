@@ -74,7 +74,7 @@ class Scheduler(BaseScheduler):
         self.state = []
         self.new_state = []
         self.participants = []
-        self.loss = 0
+        self.loss = []
         self.i = 0
         self.old_time = 0
 
@@ -83,14 +83,14 @@ class Scheduler(BaseScheduler):
             population = list(range(self.size))
             k = int(self.size * self.PORTION)
             sample = random.sample(population, k)
-            action = None
-            participants = [int(i in sample) for i in range(self.size)]
+            action = participants = [int(i in sample) for i in range(self.size)]
             self.participants.append([])
         else:
             action = self.agent.get_action(self.normalize(self.state))
             participants = torch.bernoulli(action).tolist()
+            action = action.tolist()
             self.participants.append(participants)
-        indices = [i for i in range(len(self.size)) if participants[i]]
+        indices = [i for i in range(self.size) if participants[i]]
         return action, indices
 
     def compute_reward(self, action):
@@ -104,8 +104,8 @@ class Scheduler(BaseScheduler):
 
     def update(self, action):
         reward = self.compute_reward(action)
-        state = self.normalize(self.state)
-        new_state = self.normalize(self.new_state)
+        state = self.normalize(self.state).tolist()
+        new_state = self.normalize(self.new_state).tolist()
         self.memory.push(state, action, 0, new_state, reward)
         if len(self.memory) > 10:
             transitions = self.memory.sample(10)
