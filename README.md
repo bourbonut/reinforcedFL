@@ -122,7 +122,7 @@ print(data)
 
 ## Report
 
-The ![report](./docs/report.pdf) summarizes :
+The [report](./docs/report.pdf) summarizes :
 1. A state of art of Federated Learning focused on Reinforcement Learning
 2. More details on algorithms implemented
 3. Results of several experiments
