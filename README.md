@@ -2,6 +2,10 @@
 
 ![example](./docs/example.png)
 
+> [!WARNING]
+> The code has been updated in order to use modern tools such as [uv](https://docs.astral.sh/uv/) and make it more accessible with the lastest python versions.
+> The original code version is on [tag 2023.02](https://github.com/bourbonut/reinforcedFL/tree/2023.02).
+
 ## Introduction
 
 The goal of this project is to simulate an environment for **Federated Learning** and experiment different algorithms using **Reinforcement Learning** for better aggregation or to select in a better way the next participants.
