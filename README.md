@@ -17,23 +17,15 @@ The goal of this project is to simulate an environment for **Federated Learning*
 git clone https://github.com/bourbonut/reinforcedFL.git 
 ```
 
-2. Then **create your own environment** with a version of `python >= 3.8.5`.
-For instance, with `conda` :
+2. Then **create your own environment**.
+For instance, with `uv` :
 ```shell
-conda create -n reinforcedFL python=3.8.5
-conda activate reinforcedFL
+uv venv
+pip install -r requirements.txt -r pytorch-requirements.txt
 ```
 
-3. Install `pytorch`
-For example, with `conda` :
-```
-conda install pytorch torchvision torchaudio cudatoolkit=11.6 -c pytorch -c conda-forge
-```
-
-4. Then install other packages :
-```shell
-pip install -r requirements.txt
-```
+> [!NOTE]
+> Check if the version of CUDA in `pytorch-requirements.txt` is compatible with your CUDA version (`nvidia-smi`).
 
 ## Usage
 
