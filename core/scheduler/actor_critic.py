@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-class Actor(nn.Module):
 
+class Actor(nn.Module):
     NHIDDEN = 128
 
     def __init__(self, ninput, noutput, device):
@@ -44,7 +44,6 @@ class Actor(nn.Module):
 
 
 class Critic(nn.Module):
-
     NHIDDEN = 128
 
     def __init__(self, ninput, noutput, device):
@@ -63,7 +62,6 @@ class Critic(nn.Module):
 
         # Output layer (single value)
         self.V = nn.Linear(self.NHIDDEN, 1)
-
 
     def forward(self, inputs, actions):
         x = inputs

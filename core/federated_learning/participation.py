@@ -1,8 +1,12 @@
-from core.scheduler.model import DDPG, ReplayMemory, Transition
-from math import log
+import pickle
+import random
+import statistics
 from copy import copy
 from itertools import compress
-import random, pickle, torch, statistics
+
+import torch
+
+from core.scheduler.model import DDPG, ReplayMemory, Transition
 
 
 class BaseScheduler:
@@ -17,7 +21,7 @@ class BaseScheduler:
         state = torch.tensor(state, dtype=torch.float).view(-1, self.k)
         mean = torch.cat([state.mean(0).unsqueeze(0)] * state.size(0))
         std = torch.cat([state.std(0).unsqueeze(0)] * state.size(0))
-        state = (state - mean) / std 
+        state = (state - mean) / std
         state = state / torch.norm(state, dim=0)
         return state.flatten() if flatten else state
 
@@ -36,8 +40,14 @@ class BaseScheduler:
                 self.state.extend([0.0, 0.0, 0.0])
 
         # Note here, this is an approximation of the mean of each time
-        means = [statistics.mean(filter(lambda x: x!=0., self.state[i::3])) for i in range(3)]
-        self.state = [(random.random() * 0.2 + 0.9) * means[i%3] if s==0. else s for i, s in enumerate(self.state)]
+        means = [
+            statistics.mean(filter(lambda x: x != 0.0, self.state[i::3]))
+            for i in range(3)
+        ]
+        self.state = [
+            (random.random() * 0.2 + 0.9) * means[i % 3] if s == 0.0 else s
+            for i, s in enumerate(self.state)
+        ]
 
     def update_new_state(self, workers, indices):
         self.new_state.clear()
@@ -64,7 +74,6 @@ class BaseScheduler:
 
 
 class Scheduler(BaseScheduler):
-
     K = 3
     PORTION = 0.1
 
@@ -136,7 +145,6 @@ class Scheduler(BaseScheduler):
 
 
 class RandomScheduler(BaseScheduler):
-
     PORTION = 0.1
 
     def __init__(self, size, *args, **kwargs):

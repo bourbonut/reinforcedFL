@@ -7,7 +7,7 @@ Module which deals with :
 
 from .federated_learning import aggregation, participation, worker
 
-__all__ = ["aggregation", "worker", "participation"]
+__all__ = ["aggregation", "worker", "participation", "train", "evaluate"]
 
 
 def train(workers, path=None):

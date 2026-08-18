@@ -1,5 +1,5 @@
-from itertools import accumulate, zip_longest, groupby
 import random
+from itertools import accumulate, groupby, zip_longest
 
 
 def rdindices(indices, sizes):

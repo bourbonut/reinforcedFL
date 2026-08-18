@@ -1,8 +1,7 @@
-from functools import reduce
-from itertools import accumulate, zip_longest
-from operator import add
 from collections import Counter
-import random, copy
+from functools import reduce
+from operator import add
+
 from .common import rdindices
 
 

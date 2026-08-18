@@ -1,7 +1,9 @@
+import copy
+import random
+from collections import Counter
 from functools import reduce
 from operator import add
-from collections import Counter
-import random, copy
+
 from .common import rdindices
 
 
@@ -17,26 +19,26 @@ def volume(distrb, dataset, labels):
 
 
 def label(nworkers, labels, minlabels, balanced=False):
-    l = len(labels)
+    nlabels = len(labels)
     if balanced:
         # number of labels to be added on workers
-        if nworkers * minlabels >= l * (minlabels - 1):
-            d = (nworkers * minlabels) % l
+        if nworkers * minlabels >= nlabels * (minlabels - 1):
+            d = (nworkers * minlabels) % nlabels
             if d == 0:
-                distrb = [minlabels for i in range(nworkers)]
+                distrb = [minlabels for _ in range(nworkers)]
             else:
-                p, r = divmod(l - (nworkers * minlabels) % l, nworkers)
+                p, r = divmod(nlabels - (nworkers * minlabels) % nlabels, nworkers)
                 distrb = [minlabels + p + (i < r) for i in range(nworkers)]
         else:
-            p, r = divmod(minlabels * l, nworkers)
+            p, r = divmod(minlabels * nlabels, nworkers)
             distrb = [p + (i < r) for i in range(nworkers)]
-        # distrib has k * (l * minlabels) elements
-        k = sum(distrb) // (l * minlabels)
+        # distrib has k * (nlabels * minlabels) elements
+        k = sum(distrb) // (nlabels * minlabels)
         tokens = {label: k * minlabels for label in labels}
     else:
         distrb = [minlabels for _ in range(nworkers)]
         # number of labels which are not in the distribution
-        p, r = divmod(minlabels * (l - minlabels), 10)
+        p, r = divmod(minlabels * (nlabels - minlabels), 10)
         low_labels = random.sample(labels, r)
         tokens = {label: minlabels - p - (label in low_labels) for label in labels}
     clabels = copy.copy(labels)
@@ -48,7 +50,7 @@ def label(nworkers, labels, minlabels, balanced=False):
             clabels.pop(clabels.index(label))
         return label
 
-    return tuple(tuple(random_label() for _ in range(n)) for n in distrb)
+    return list(list(random_label() for _ in range(n)) for n in distrb)
 
 
 def divide(size, nfractions):

@@ -1,11 +1,7 @@
-# https://towardsdatascience.com/learning-reinforcement-learning-reinforce-with-pytorch-5e8ad7fc7da0
-
 import numpy as np
 import torch
 from torch import device, nn, optim
 from torch.nn import functional as F
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class ReinforceAgent(nn.Module):
@@ -53,6 +49,7 @@ class ReinforceAgent(nn.Module):
         return F.softmax(output, dim=1)
 
 
+# Only for testing REINFORCE algorithm
 class CartPoleAgent(nn.Module):
     """
     Neural network for REINFORCE algorithm

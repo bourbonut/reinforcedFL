@@ -1,14 +1,18 @@
-from utils import *
-from core import *
-import model4FL
-import argparse, torch, json
-from rich.markdown import Markdown
-from rich.table import Table
-from rich.console import Console, Group
-from rich.align import Align
-from rich.live import Live
-from rich.panel import Panel
+import argparse
+import json
 from pathlib import Path
+
+import torch
+from rich.align import Align
+from rich.console import Console, Group
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.table import Table
+
+import model4FL
+from core import *
+from utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument(dest="environment", help="environment path")
@@ -48,7 +52,9 @@ ROUNDS = parameters["environment"]["rounds"]
 NWORKERS = parameters["environment"]["nworkers"]
 EPOCHS = parameters["environment"]["epochs"]
 server_class = getattr(aggregation, parameters["model"]["server_class"])
-scheduler_class = getattr(participation, parameters["model"].get("scheduler_class", "FullScheduler"))
+scheduler_class = getattr(
+    participation, parameters["model"].get("scheduler_class", "FullScheduler")
+)
 worker_class = getattr(worker, parameters["model"]["worker_class"])
 
 parameters["model"]["size"] = NWORKERS
@@ -159,7 +165,7 @@ with Live(panel, auto_refresh=False) as live:
     workers = tuple(
         worker_class(
             model.to(device),
-            wk_data_path / f"worker-{i+1}.pkl",
+            wk_data_path / f"worker-{i + 1}.pkl",
             EPOCHS,
             batch_size=batch_size,
         )

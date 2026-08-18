@@ -120,7 +120,10 @@ def generate(
     msg = "Training data must have the same labels as testing data"
     assert datatrain.classes == datatest.classes, msg
     msg = "Training data must have the same number of labels as testing data"
-    get_nb_labels = lambda x: len(list(x.class_to_idx.values()))
+
+    def get_nb_labels(x):
+        return len(list(x.class_to_idx.values()))
+
     assert get_nb_labels(datatrain) == get_nb_labels(datatest), msg
 
     # Values which are equal to the label of classes
@@ -132,7 +135,9 @@ def generate(
         datatest = AugmentedDataset(datatest, k, noise=noise)
 
     # Load functions for distribution
-    get = lambda distrb: importlib.import_module(f"utils.distribution.{distrb}")
+    def get(distrb):
+        return importlib.import_module(f"utils.distribution.{distrb}")
+
     label = getattr(get(label_distrb), "label")
     volume = getattr(get(volume_distrb), "volume")
 

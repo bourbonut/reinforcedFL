@@ -1,10 +1,11 @@
+import random
+from collections import namedtuple
+
 import torch
-from torch import nn
 from torch.nn import functional as F
 from torch.optim import Adam
+
 from core.scheduler.actor_critic import Actor, Critic
-from collections import namedtuple
-import random
 
 Transition = namedtuple(
     "Transition", ("state", "action", "done", "next_state", "reward")
@@ -47,13 +48,12 @@ def hard_update(target, source):
 
 
 class DDPG(object):
-
     NHIDDEN = 128
 
     def __init__(self, ninput, noutput, device):
         self.gamma = 0.99
         self.tau = 0.01
-        self.action_space = [0., 1.]
+        self.action_space = [0.0, 1.0]
         self.device = device
 
         # Define the actor

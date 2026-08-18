@@ -1,6 +1,5 @@
-from torch import nn
+from torch import nn, optim
 from torch.nn import functional as F
-from torch import optim
 
 
 class Model(nn.Module):
@@ -9,7 +8,7 @@ class Model(nn.Module):
     """
 
     def __init__(self, nclasses, device):
-        super(Model, self).__init__()
+        super().__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=(3, 3))
         self.conv2 = nn.Conv2d(32, 64, kernel_size=(3, 3))
         self.maxp2d = nn.MaxPool2d((2, 2))

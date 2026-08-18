@@ -1,9 +1,11 @@
-from core.evaluator.model import ReinforceAgent
+import pickle
 from collections import deque
 from itertools import compress
-from math import log
+
+import torch
 from utils.plot import lineXY
-import torch, pickle
+
+from core.evaluator.model import ReinforceAgent
 
 
 class MovingBatch:
@@ -82,7 +84,7 @@ class BaseServer:
         self.participants_updates = []
         self.n = size_traindata  # list
         self.t = size_testdata  # list
-        self.path = None
+        self.path = None  # TODO: add an argument to avoid None as default value
 
     def send(self):
         """
@@ -140,7 +142,7 @@ class EvaluatorServer(BaseServer):
         gamma=0.99,
         optimizer=None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize the class
