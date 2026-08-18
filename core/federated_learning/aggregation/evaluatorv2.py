@@ -1,10 +1,13 @@
-from core.federated_learning.aggregation.base import EvaluatorServer
-from rich.table import Table
+import pickle
+from math import log
+from time import perf_counter
+
+import torch
 from rich.align import Align
 from rich.live import Live
-from time import perf_counter
-from math import log
-import torch, pickle
+from rich.table import Table
+
+from core.federated_learning.aggregation.base import EvaluatorServer
 
 
 class EvaluatorV2(EvaluatorServer):
@@ -15,7 +18,7 @@ class EvaluatorV2(EvaluatorServer):
 
     The state is defined as the accuracies of workers after local
     training less the accuracies of the global model before aggregation
-    
+
     The reward is defined with two different ways
     - with an exponential moving average
     - with an exponential function
@@ -63,9 +66,9 @@ class EvaluatorV2(EvaluatorServer):
             optimizer,
         )
         if delta_method:
-            self.delta = 0 # Window for moving average
+            self.delta = 0  # Window for moving average
         else:
-            self.speed = log(1e-6) / log(1 - 0.95) # exponent for reward
+            self.speed = log(1e-6) / log(1 - 0.95)  # exponent for reward
         self.delta_method = delta_method
 
     def compute_glb_acc(self, workers_accuracies, train=False):
@@ -130,7 +133,7 @@ class EvaluatorV2(EvaluatorServer):
                 "Round",
                 "Training accuracies [%]",
                 "Testing accuracies [%]",
-                "Duration \[s]",
+                "Duration [s]",
                 "Losses",
                 title=f"Experiment {iexp}",
             )

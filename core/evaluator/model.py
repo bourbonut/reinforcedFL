@@ -1,15 +1,14 @@
 # https://towardsdatascience.com/learning-reinforcement-learning-reinforce-with-pytorch-5e8ad7fc7da0
 
-import torch
-from torch import nn
-from torch.nn import functional as F
-from torch import optim
 import numpy as np
+import torch
+from torch import device, nn, optim
+from torch.nn import functional as F
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class ReinforceAgent(nn.Module):
 
+class ReinforceAgent(nn.Module):
     """
     Neural network for REINFORCE algorithm
     """
@@ -17,8 +16,8 @@ class ReinforceAgent(nn.Module):
     NHIDDEN = 128
 
     def __init__(self, ninput, noutput, device, *args, **kwargs):
-        super(ReinforceAgent, self).__init__()
-        # Layers for selection 
+        super().__init__()
+        # Layers for selection
         self.input1 = nn.Linear(ninput, self.NHIDDEN)
         self.hidden11 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
         self.hidden12 = nn.Linear(self.NHIDDEN, self.NHIDDEN)
@@ -49,12 +48,12 @@ class ReinforceAgent(nn.Module):
         x2 = F.relu(self.hidden22(x2))
         x2 = F.relu(self.hidden23(x2))
         output2 = self.output2(x2)
-        
+
         output = torch.stack((output1, output2), dim=1)
         return F.softmax(output, dim=1)
 
-class CartPoleAgent(nn.Module):
 
+class CartPoleAgent(nn.Module):
     """
     Neural network for REINFORCE algorithm
     """
@@ -62,7 +61,7 @@ class CartPoleAgent(nn.Module):
     NHIDDEN = 16
 
     def __init__(self, ninput, noutput, *args, **kwargs):
-        super(ReinforceAgent, self).__init__()
+        super().__init__()
         self.input = nn.Linear(ninput, self.NHIDDEN)
         self.output = nn.Linear(self.NHIDDEN, noutput)
 
@@ -70,6 +69,7 @@ class CartPoleAgent(nn.Module):
         x = x.to(device)
         x = F.relu(self.input(x))
         return F.softmax(self.output(x), dim=-1)
+
 
 def discount_rewards(rewards, gamma=0.99):
     """
@@ -88,7 +88,6 @@ def reinforce(env, policy_estimator, num_episodes=2000, batch_size=10, gamma=0.9
     """
     # Set up lists to hold results
     results = {"ep": [], "avg_rewards": []}
-    totorch = lambda x: torch.from_numpy(x)
     total_rewards = []
     batch_rewards = []
     batch_actions = []
@@ -97,21 +96,22 @@ def reinforce(env, policy_estimator, num_episodes=2000, batch_size=10, gamma=0.9
 
     # Define optimizer
     optimizer = optim.Adam(policy_estimator.parameters(), lr=0.01)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     action_space = np.arange(env.action_space.n)
     ep = 0
     while ep < num_episodes:
-        s_0 = env.reset()
+        s_0 = env.reset()[0]
         states = []
         rewards = []
         actions = []
         done = False
-        while done == False:
+        while not done:
             # Get actions and convert to numpy array
-            tensor_state = totorch(s_0)
-            action_probs = policy_estimator.forward(tensor_state).detach().numpy()
+            tensor_state = torch.from_numpy(s_0).to(device)
+            action_probs = policy_estimator.forward(tensor_state).cpu().detach().numpy()
             action = np.random.choice(action_space, p=action_probs)
-            s_1, r, done, _ = env.step(action)
+            s_1, r, done, _, _ = env.step(action)
 
             states.append(s_0)
             rewards.append(r)
@@ -129,10 +129,14 @@ def reinforce(env, policy_estimator, num_episodes=2000, batch_size=10, gamma=0.9
                 # If batch is complete, update network
                 if batch_counter == batch_size:
                     optimizer.zero_grad()
-                    state_tensor = torch.FloatTensor(np.array(batch_states))
-                    reward_tensor = torch.FloatTensor(np.array(batch_rewards))
+                    state_tensor = torch.FloatTensor(np.array(batch_states)).to(device)
+                    reward_tensor = torch.FloatTensor(np.array(batch_rewards)).to(
+                        device
+                    )
                     # Actions are used as indices, must be LongTensor
-                    action_tensor = torch.LongTensor(np.array([batch_actions])).T
+                    action_tensor = (
+                        torch.LongTensor(np.array([batch_actions])).to(device).T
+                    )
 
                     # Calculate loss
                     logprob = torch.log(policy_estimator.forward(state_tensor))

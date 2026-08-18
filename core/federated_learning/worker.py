@@ -1,8 +1,12 @@
-from torch.utils.data import DataLoader
-from torch import optim, nn, rand
-import pickle, torch, statistics
-from utils.plot import lineXY
+import pickle
 import random
+import statistics
+
+import torch
+from torch import nn, optim
+from torch.utils.data import DataLoader
+
+from utils.plot import lineXY
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

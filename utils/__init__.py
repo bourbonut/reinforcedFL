@@ -5,12 +5,25 @@ Module for all functions useful for :
 - plotting
 """
 
-from .path import *
-from .distribution import *
-from .plot import chart, topng
 from torchvision import datasets
-from torchvision.transforms import ToTensor, Compose, Normalize
-from pygal.style import DefaultStyle
+from torchvision.transforms import Compose, Normalize, ToTensor
+
+from .distribution import generate, iid, noniid
+from .path import DATA_PATH, EXP_PATH, create, iterate
+from .plot import chart
+
+__all__ = [
+    "generate",
+    "iid",
+    "noniid",
+    "create",
+    "iterate",
+    "tracker",
+    "dataset",
+    "toplot",
+    "DATA_PATH",
+    "EXP_PATH",
+]
 
 
 def tracker(
@@ -45,15 +58,13 @@ def dataset(name):
 
 
 def toplot(global_accs):
-    return topng(
-        chart(
-            range(1, max(map(len, global_accs)) + 1),
-            {"Training acc": global_accs[0], "Testing acc": global_accs[1]},
-            title="Evolution of the average accuracy per round",
-            x_title="Rounds",
-            y_title="Accuracy (in %)",
-            print_labels=True,
-            margin_right=75,
-            # style=DefaultStyle(label_font_size=8),
-        )
+    return chart(
+        range(1, max(map(len, global_accs)) + 1),
+        {"Training acc": global_accs[0], "Testing acc": global_accs[1]},
+        title="Evolution of the average accuracy per round",
+        x_title="Rounds",
+        y_title="Accuracy (in %)",
+        print_labels=True,
+        margin_right=75,
+        # style=DefaultStyle(label_font_size=8),
     )

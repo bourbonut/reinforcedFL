@@ -1,12 +1,12 @@
-from pygal.util import compute_logarithmic_scale
-from torch import rand
-from torch.utils.data import communication
-from core.federated_learning.aggregation.base import BaseServer
-from rich.table import Table
+import pickle
+import statistics
+from time import perf_counter
+
 from rich.align import Align
 from rich.live import Live
-from time import perf_counter
-import pickle, statistics
+from rich.table import Table
+
+from core.federated_learning.aggregation.base import BaseServer
 
 
 class FederatedAveraging(BaseServer):
@@ -112,9 +112,9 @@ class FederatedAveraging(BaseServer):
                 "Round",
                 "Training accuracies [%]",
                 "Testing accuracies [%]",
-                "Duration \[s]",
+                "Duration [s]",
                 "Losses",
-                "Time (computation & communication) \[s]",
+                "Time (computation & communication) [s]",
                 title=f"Experiment {iexp}",
             )
 

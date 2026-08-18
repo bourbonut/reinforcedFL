@@ -1,8 +1,10 @@
-from utils.path import *
+from pathlib import Path
+
+from utils.path import EXP_PATH, ROOT_PATH, create, iterate
 
 
 def test_root():
-    assert not ("utils" in str(ROOT_PATH)) and Path().absolute() == ROOT_PATH
+    assert "utils" not in str(ROOT_PATH) and Path().absolute() == ROOT_PATH
 
 
 def test_experiments():

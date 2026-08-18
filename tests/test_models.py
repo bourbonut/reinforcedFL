@@ -1,11 +1,9 @@
-from utils.path import DATA_PATH
-from utils import dataset
-from model4FL.mnist import Model, extras
-from torchvision import datasets
-from torchvision.transforms import ToTensor
+import pytest
 import torch
 from rich.progress import Progress
-import pytest
+
+from model4FL.mnist import Model, extras
+from utils import dataset
 
 datatrain, datatest = dataset("MNIST")
 batch_size = 64
@@ -19,7 +17,8 @@ testloader = torch.utils.data.DataLoader(
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 nclasses = len(datatrain.classes)
-model = Model(nclasses).to(device)
+model = Model(nclasses, device).to(device)
+
 
 def test_forward():
     sample, _ = datatrain[0]
@@ -27,15 +26,15 @@ def test_forward():
 
 
 def test_loss():
-    i, (sample, label) = next(enumerate(trainloader))
+    _, (sample, label) = next(enumerate(trainloader))
     prediction = model(sample)
     criterion = extras["criterion"]()
 
-    loss = criterion(prediction, label.to(device))
+    criterion(prediction, label.to(device))
 
 
 def test_backpropagation():
-    i, (samples, labels) = next(enumerate(trainloader))
+    _, (samples, labels) = next(enumerate(trainloader))
     prediction = model(samples)
     optimizer = extras["optimizer"](model.parameters())
 
@@ -57,10 +56,10 @@ def test_train():
     with Progress(auto_refresh=False) as progress:
         nsteps = size * num_epochs // batch_size
         task = progress.add_task("Training ...", total=nsteps)
-        for epoch in range(num_epochs):
+        for _ in range(num_epochs):
             correct = 0
             total = 0
-            for i, (samples, labels) in enumerate(trainloader):
+            for _, (samples, labels) in enumerate(trainloader):
                 predictions = model(samples)
                 loss = criterion(predictions, labels.to(device))
 

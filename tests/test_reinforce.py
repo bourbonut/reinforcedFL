@@ -1,10 +1,13 @@
-from core.evaluator.model import *
-import gym
+import gymnasium as gym
 import pytest
+import torch
+
+from core.evaluator.model import CartPoleAgent, reinforce
 
 env = gym.make("CartPole-v0")
 ninput = env.observation_space.shape[0]
 noutput = env.action_space.n
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 agent = CartPoleAgent(ninput, noutput).to(device)
 
 

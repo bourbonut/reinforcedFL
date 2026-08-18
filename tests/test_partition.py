@@ -1,22 +1,28 @@
-from utils import tracker, dataset
-from utils.path import create, iterate, EXP_PATH, DATA_PATH
-from utils.distribution import *
-from utils.distribution.partition import AugmentedDataset
+import pickle
+
+import pytest
 from torch.utils.data import DataLoader
-import pickle, pytest
+
+from utils import dataset, tracker
+from utils.distribution import generate, iid, noniid
+from utils.distribution.partition import AugmentedDataset
+from utils.path import DATA_PATH, EXP_PATH, create
 
 create(EXP_PATH)
 nworkers = 7
 datatrain, datatest = dataset("MNIST")
 
+
 def test_check_data():
     assert DATA_PATH.exists()
+
 
 def test_augmented_dataset_class():
     augdata = AugmentedDataset(datatrain, 5)
     assert len(augdata) == len(datatrain) * 5
     assert augdata[0][0].size() == datatrain[0][0].size()
-    assert type(augdata[0][1]) == int
+    assert isinstance(augdata[0][1], int)
+
 
 def test_iid_label():
     labels = iid.label(nworkers, list(datatrain.class_to_idx.values()))
@@ -76,11 +82,19 @@ def test_noniid_volume():
         assert len(sidcs.intersection(indices)) == 0
         indices = indices.union(sidcs)
 
+
 @pytest.mark.slow
 def test_generate_IID():
     wk_data_path = EXP_PATH / tracker("MNIST", nworkers, "iid", "iid")
     create(wk_data_path)
-    generate(wk_data_path, datatrain, datatest, nworkers, label_distrb="iid", volume_distrb="iid")
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        nworkers,
+        label_distrb="iid",
+        volume_distrb="iid",
+    )
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
     ref = len(list(datatrain.class_to_idx.values()))
@@ -92,41 +106,81 @@ def test_generate_IID():
         assert len(tr_extracted_labels) == ref
         assert len(te_extracted_labels) == ref
 
+
 @pytest.mark.slow
 def test_generate_nonIID_label_balanced():
     nworkers = 7
     wk_data_path = EXP_PATH / tracker("MNIST", nworkers, "noniid", "iid", balanced=True)
     create(wk_data_path)
-    generate(wk_data_path, datatrain, datatest, nworkers, label_distrb="noniid", volume_distrb="iid", balanced=True)
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        nworkers,
+        label_distrb="noniid",
+        volume_distrb="iid",
+        balanced=True,
+    )
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
+
 
 @pytest.mark.slow
 def test_generate_nonIID_label_unbalanced():
     nworkers = 7
-    wk_data_path = EXP_PATH / tracker("MNIST", nworkers, "noniid", "iid", balanced=False)
+    wk_data_path = EXP_PATH / tracker(
+        "MNIST", nworkers, "noniid", "iid", balanced=False
+    )
     create(wk_data_path)
-    generate(wk_data_path, datatrain, datatest, nworkers, label_distrb="noniid", volume_distrb="iid", balanced=False)
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        nworkers,
+        label_distrb="noniid",
+        volume_distrb="iid",
+        balanced=False,
+    )
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
+
 
 @pytest.mark.slow
 def test_generate_nonIID_volume():
     nworkers = 7
     wk_data_path = EXP_PATH / tracker("MNIST", nworkers, "iid", "noniid")
     create(wk_data_path)
-    generate(wk_data_path, datatrain, datatest, nworkers, label_distrb="iid", volume_distrb="noniid")
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        nworkers,
+        label_distrb="iid",
+        volume_distrb="noniid",
+    )
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
+
 
 @pytest.mark.slow
 def test_generate_nonIID():
     nworkers = 7
-    wk_data_path = EXP_PATH / tracker("MNIST", nworkers, "noniid", "noniid", balanced=False)
+    wk_data_path = EXP_PATH / tracker(
+        "MNIST", nworkers, "noniid", "noniid", balanced=False
+    )
     create(wk_data_path)
-    generate(wk_data_path, datatrain, datatest, nworkers, label_distrb="noniid", volume_distrb="iid", balanced=False)
+    generate(
+        wk_data_path,
+        datatrain,
+        datatest,
+        nworkers,
+        label_distrb="noniid",
+        volume_distrb="iid",
+        balanced=False,
+    )
     assert wk_data_path.exists()
     assert len(list(wk_data_path.iterdir())) == nworkers
+
 
 @pytest.mark.slow
 def test_open_dataset():

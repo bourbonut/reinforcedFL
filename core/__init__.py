@@ -5,7 +5,9 @@ Module which deals with :
 - Main functions for training and evaluation
 """
 
-from .federated_learning import aggregation, worker, participation
+from .federated_learning import aggregation, participation, worker
+
+__all__ = ["aggregation", "worker", "participation"]
 
 
 def train(workers, path=None):

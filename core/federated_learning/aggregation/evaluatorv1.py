@@ -1,11 +1,14 @@
-from core.federated_learning.aggregation.base import EvaluatorServer
-from rich.table import Table
+import pickle
+from copy import copy
+from itertools import compress
+from time import perf_counter
+
+import torch
 from rich.align import Align
 from rich.live import Live
-from time import perf_counter
-from itertools import compress
-from copy import copy
-import torch, pickle
+from rich.table import Table
+
+from core.federated_learning.aggregation.base import EvaluatorServer
 
 
 class EvaluatorV1(EvaluatorServer):
@@ -14,7 +17,7 @@ class EvaluatorV1(EvaluatorServer):
     the evaluator module (`core.evaluator`) for a better aggregation
     (inspired by the algorithm `FRCCE` - `arXiv:2102.13314v1`)
 
-    The state is defined as the accuracies after aggregation 
+    The state is defined as the accuracies after aggregation
     The reward is computed as the exponential moving average
     of the average of accuracies.
     """
@@ -55,7 +58,7 @@ class EvaluatorV1(EvaluatorServer):
             gamma,
             optimizer,
         )
-        self.delta = 0 # Window for moving average
+        self.delta = 0  # Window for moving average
 
     def collect_accuracy(self, worker_accuracy):
         """
@@ -68,13 +71,13 @@ class EvaluatorV1(EvaluatorServer):
         For convenience, this method is used for communication.
         """
         super().communicatewith(worker)
-        self.collect_accuracy(worker.evaluate(train=True, perlabel=True))  
+        self.collect_accuracy(worker.evaluate(train=True, perlabel=True))
 
     def compute_glb_acc(self, workers_accuracies, train=False):
         """
         Compute the global accuracy based on the Federated Averaging algorithm
         """
-        indices = range(len(workers_accuracies)) # all workers are participants
+        indices = range(len(workers_accuracies))  # all workers are participants
         return super().compute_glb_acc(workers_accuracies, indices, train)
 
     def update_batch(self, state, action):
@@ -102,7 +105,7 @@ class EvaluatorV1(EvaluatorServer):
         self.accuracies.clear()
 
         return super().train_agent()
-    
+
     def reset(self, filename=None):
         """
         Reset work values for the next round
@@ -123,7 +126,7 @@ class EvaluatorV1(EvaluatorServer):
                 "Round",
                 "Training accuracies [%]",
                 "Testing accuracies [%]",
-                "Duration \[s]",
+                "Duration [s]",
                 "Losses",
                 title=f"Experiment {iexp}",
             )

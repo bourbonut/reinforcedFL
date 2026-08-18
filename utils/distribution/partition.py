@@ -2,12 +2,16 @@
 Functions to partition data
 """
 
-import random, pickle, torch, copy
+import importlib
+import pickle
+import random
 from functools import reduce
 from operator import add, itemgetter
-from utils.plot import stacked
+
+import torch
+
 from utils.distribution.common import sort_per_label
-import importlib
+from utils.plot import stacked
 
 
 class WorkerDataset(torch.utils.data.Dataset):
@@ -29,6 +33,7 @@ class WorkerDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return self.data[idx]
 
+
 class AugmentedDataset(torch.utils.data.Dataset):
     """
     Class for augmented dataset
@@ -40,26 +45,26 @@ class AugmentedDataset(torch.utils.data.Dataset):
         and k times the total size
 
         Parameters:
-            
-            dataset (torch.utils.data.Dataset): 
+
+            dataset (torch.utils.data.Dataset):
                 the dataset which is going to be augmented
 
             k (float):      the percentage for augmentation (must be greater than 1)
-            noise (int):    the amount of noise added 
+            noise (int):    the amount of noise added
         """
         assert k > 1, "k must be greater than 1 (e.g. `k = 1.5`)"
         self.noise = noise
         self.k = k
-        sorted_data=sort_per_label(dataset, key=itemgetter(1))
-        self.data = reduce(add, map(self.augment, sorted_data.values())) 
+        sorted_data = sort_per_label(dataset, key=itemgetter(1))
+        self.data = reduce(add, map(self.augment, sorted_data.values()))
         random.shuffle(self.data)
 
     def __getitem__(self, idx):
         return self.data[idx]
 
     def __len__(self):
-        return len(self.data) 
-    
+        return len(self.data)
+
     def make_noise(self, sample):
         """
         Add noise to the given sample
@@ -67,10 +72,10 @@ class AugmentedDataset(torch.utils.data.Dataset):
         x, y = sample
         noise = torch.randint(0, self.noise, x.size())
         return [x + noise, y]
-    
+
     def augment(self, samples):
         """
-        Add random samples from the given samples, 
+        Add random samples from the given samples,
         make noise on all samples and return samples
         """
         size = len(samples)
@@ -80,6 +85,7 @@ class AugmentedDataset(torch.utils.data.Dataset):
         new_samples += random.sample(samples, augmented_size)
         total_samples = samples + new_samples
         return [self.make_noise(sample) for sample in total_samples]
+
 
 def generate(
     path,
@@ -123,7 +129,7 @@ def generate(
     # Data augmentation
     if k is not None:
         datatrain = AugmentedDataset(datatrain, k, noise=noise)
-        datatest = AugmentedDataset(datatest, k, noise=noise) 
+        datatest = AugmentedDataset(datatest, k, noise=noise)
 
     # Load functions for distribution
     get = lambda distrb: importlib.import_module(f"utils.distribution.{distrb}")
