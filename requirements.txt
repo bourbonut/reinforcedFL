@@ -1,6 +1,6 @@
 pytest
 gymnasium
 numpy
-detroit
+pygal
 rich-cli
 cairosvg
