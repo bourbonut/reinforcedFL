@@ -33,82 +33,64 @@ uv pip install -r pytorch-requirements.txt
 
 ## Usage
 
-### Configuration tree
-Three configurations files must be created to run a simulation. It is recommended to create the following tree:
-```
-.
-├── main.py
-├── ...
-└── configurations
-    ├── environment
-    │   ├── env20.json
-    │   ├── ...
-    │   └── env100.json
-    ├── distribution
-    │   ├── iid.json
-    │   ├── ...
-    │   └── noniid.json
-    └── model
-        ├── fedavg.json
-        ├── ...
-        └── evaluator.json
-```
+### Configuration file
 
-### Example of configuration files
+You should create a `config.toml` file at the root of the project.
 
-Comments with `#` must be deleted.
+```toml
+[environment.env20]
+nexps = 20        # number of experiments
+rounds = 10       # number of rounds
+epochs = 3        # number of epochs
+nworkers = 20     # number of workers
+dataset = "MNIST" # name of the dataset
 
-- In an `environment` file :
-```
-{
-    "nexps": 20,	   # number of experiments
-    "rounds": 10,	   # number of rounds
-    "epochs": 3,	   # number of epochs
-    "nworkers": 20,	   # number of workers
-    "dataset": "MNIST" # name of the dataset
-}
-```
+[environment.env100]
+nexps = 20
+rounds = 10
+epochs = 3
+nworkers = 100
+dataset = "MNIST"
 
-- In an `distribution` file :
-```
-{
-    "label_distrb": "noniid",  # labels are non independent and identically distributed
-    "minlabels": 3,		       # there are at least 3 labels per worker
-    "volume_distrb": "noniid", # volume of data is non independent and identically distributed
-    "balanced": true,		   # True for "per worker" else each worker is a cluster of labels
-    "k": 5			           # coefficient for data augmentation (example MNIST : 60_000 x 5 = 300_000 samples)
-}
-```
+[distribution.iid]
+label_distrb = "iid"
+minlabels = 3
+volume_distrb = "iid"
+balanced = true
+k = 5
 
-- In an `model` file :
-```
-{
-  "worker_class": "Worker",		        # name of the worker class
-  "server_class": "FederatedAveraging",	# name of the algorithm for aggregation
-  "scheduler_class": "RandomScheduler",	# name of the scheduler class
-  "task_model": "mnist",		        # name of the task model for workers
-  "batch_size": 64			            # batch size
-}
-```
+[distribution.noniid]
+label_distrb = "noniid"   # labels are non independent and identically distributed
+minlabels = 3             # there are at least 3 labels per worker
+volume_distrb = "noniid"  # volume of data is non independent and identically distributed
+balanced = true           # True for "per worker" else each worker is a cluster of labels
+k = 5                     # coefficient for data augmentation (example MNIST : 60_000 x 5 = 300_000 samples)
 
+[model.fedavg]
+worker_class = "Worker"             # name of the worker class
+server_class = "FederatedAveraging" # name of the algorithm for aggregation
+scheduler_class = "RandomScheduler" # name of the scheduler class
+task_model = "mnist"                # name of the task model for workers
+batch_size = 64                     # batch size
+```
 
 ### Run a simulation
 
 Run the following command :
 ```shell
-python main.py <path_env_conf> <path_distrb_file> <path_model_file>
+uv run python main.py <env_name> <distrb_name> <model_name>
 ```
 Add the flag `--cpu` to run on CPU and the flag `--refresh` to refresh the distribution of data if you need.
 By default, the program will choose the GPU if there is one, else it will run on CPU.
 
 For instance :
 ```shell
-python main.py ./configurations/environment/env20.json ./configurations/distribution/iid.json ./configurations/model/fedavg.json --cpu --refresh
+uv run python main.py env20 iid fedavg --cpu --refresh
 ```
 
 ### Results
 
-For each experiment, data are distributed and saved in `./experiments` as results. 
+For each experiment, data are distributed and saved in `./experiments` folder as results. 
 If the data was already generated, it can be generated again with the flag `--refresh` else, the program will skip the generation of data.
 The index of the name of the directory `./experiments/experiment-{k}` increases by increments between each experiment.
 Almost all results are saved as `.pkl` file (see [pickle](https://docs.python.org/3/library/pickle.html)) and can be opened easily :
