@@ -3,10 +3,10 @@ import pickle
 import pytest
 from torch.utils.data import DataLoader
 
-from utils import dataset, tracker
-from utils.distribution import generate, iid, noniid
-from utils.distribution.partition import AugmentedDataset
-from utils.path import DATA_PATH, EXP_PATH, create
+from reinforcedFL.utils import dataset, tracker
+from reinforcedFL.utils.distribution import generate, iid, noniid
+from reinforcedFL.utils.distribution.partition import AugmentedDataset
+from reinforcedFL.utils.path import DATA_PATH, EXP_PATH, create
 
 create(EXP_PATH)
 nworkers = 7

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from utils.path import EXP_PATH, ROOT_PATH, create, iterate
+from reinforcedFL.utils.path import EXP_PATH, ROOT_PATH, create, iterate
 
 
 def test_root():

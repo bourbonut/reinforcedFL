@@ -2,7 +2,7 @@ import gymnasium as gym
 import pytest
 import torch
 
-from core.evaluator.model import CartPoleAgent, reinforce
+from reinforcedFL.core.evaluator.model import CartPoleAgent, reinforce
 
 env = gym.make("CartPole-v0")
 ninput = env.observation_space.shape[0]

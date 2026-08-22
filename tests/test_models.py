@@ -2,8 +2,8 @@ import pytest
 import torch
 from rich.progress import Progress
 
-from model4FL.mnist import Model, extras
-from utils import dataset
+from reinforcedFL.model4FL.mnist import Model, extras
+from reinforcedFL.utils import dataset
 
 datatrain, datatest = dataset("MNIST")
 batch_size = 64

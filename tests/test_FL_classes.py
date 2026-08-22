@@ -4,10 +4,10 @@ from threading import Thread
 import pytest
 import torch
 
-from core.federated_learning.aggregation import FederatedAveraging
-from core.federated_learning.worker import Worker
-from model4FL.mnist import Model, extras
-from utils import EXP_PATH, tracker
+from reinforcedFL.core.federated_learning.aggregation import FederatedAveraging
+from reinforcedFL.core.federated_learning.worker import Worker
+from reinforcedFL.model4FL.mnist import Model, extras
+from reinforcedFL.utils import EXP_PATH, tracker
 
 wk_data_path = EXP_PATH / tracker("MNIST", 4, "iid", "iid")
 
