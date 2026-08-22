@@ -5,7 +5,7 @@ import torch
 from torch.nn import functional as F
 from torch.optim import Adam
 
-from core.scheduler.actor_critic import Actor, Critic
+from reinforcedFL.core.scheduler.actor_critic import Actor, Critic
 
 Transition = namedtuple(
     "Transition", ("state", "action", "done", "next_state", "reward")

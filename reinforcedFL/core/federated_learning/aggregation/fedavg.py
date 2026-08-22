@@ -6,7 +6,7 @@ from rich.align import Align
 from rich.live import Live
 from rich.table import Table
 
-from core.federated_learning.aggregation.base import BaseServer
+from .base import BaseServer
 
 
 class FederatedAveraging(BaseServer):

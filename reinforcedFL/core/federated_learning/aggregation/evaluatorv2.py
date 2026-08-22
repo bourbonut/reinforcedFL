@@ -7,7 +7,7 @@ from rich.align import Align
 from rich.live import Live
 from rich.table import Table
 
-from core.federated_learning.aggregation.base import EvaluatorServer
+from .base import EvaluatorServer
 
 
 class EvaluatorV2(EvaluatorServer):

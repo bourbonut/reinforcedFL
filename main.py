@@ -10,9 +10,9 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-import model4FL
-from core import aggregation, evaluate, participation, train, worker
-from utils import EXP_PATH, create, dataset, generate, iterate, tracker
+from reinforcedFL import model4FL
+from reinforcedFL.core import aggregation, evaluate, participation, train, worker
+from reinforcedFL.utils import EXP_PATH, create, dataset, generate, iterate, tracker
 
 parser = argparse.ArgumentParser()
 parser.add_argument(dest="environment", help="environment path")

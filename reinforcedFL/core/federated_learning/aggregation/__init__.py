@@ -6,8 +6,8 @@ found in `core/federated_learning/participation.py`
 and are different for the definition of the state and the reward
 """
 
-from core.federated_learning.aggregation.evaluatorv1 import EvaluatorV1
-from core.federated_learning.aggregation.evaluatorv2 import EvaluatorV2
-from core.federated_learning.aggregation.fedavg import FederatedAveraging
+from .evaluatorv1 import EvaluatorV1
+from .evaluatorv2 import EvaluatorV2
+from .fedavg import FederatedAveraging
 
 __all__ = ["EvaluatorV1", "EvaluatorV2", "FederatedAveraging"]

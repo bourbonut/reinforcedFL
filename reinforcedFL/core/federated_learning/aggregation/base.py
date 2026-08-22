@@ -3,9 +3,9 @@ from collections import deque
 from itertools import compress
 
 import torch
-from utils.plot import lineXY
 
-from core.evaluator.model import ReinforceAgent
+from reinforcedFL.core.evaluator.model import ReinforceAgent
+from reinforcedFL.utils.plot import lineXY
 
 
 class MovingBatch:

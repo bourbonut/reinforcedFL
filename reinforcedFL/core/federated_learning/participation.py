@@ -6,7 +6,7 @@ from itertools import compress
 
 import torch
 
-from core.scheduler.model import DDPG, ReplayMemory, Transition
+from reinforcedFL.core.scheduler.model import DDPG, ReplayMemory, Transition
 
 
 class BaseScheduler:

@@ -10,8 +10,8 @@ from operator import add, itemgetter
 
 import torch
 
-from utils.distribution.common import sort_per_label
-from utils.plot import stacked
+from reinforcedFL.utils.distribution.common import sort_per_label
+from reinforcedFL.utils.plot import stacked
 
 
 class WorkerDataset(torch.utils.data.Dataset):
@@ -136,7 +136,7 @@ def generate(
 
     # Load functions for distribution
     def get(distrb):
-        return importlib.import_module(f"utils.distribution.{distrb}")
+        return importlib.import_module(f"reinforcedFL.utils.distribution.{distrb}")
 
     label = getattr(get(label_distrb), "label")
     volume = getattr(get(volume_distrb), "volume")

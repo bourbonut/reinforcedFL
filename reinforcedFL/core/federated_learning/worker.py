@@ -5,7 +5,8 @@ import statistics
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
-from utils.plot import lineXY
+
+from reinforcedFL.utils.plot import lineXY
 
 
 class Worker:

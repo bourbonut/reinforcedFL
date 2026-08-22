@@ -4,6 +4,6 @@ Module which holds all models which are used for learning on local data :
 - FashionMNIST model
 """
 
-from model4FL import fashionmnist, mnist  # cifar10
+from . import fashionmnist, mnist  # cifar10
 
 __all__ = ["mnist", "fashionmnist"]  # "cifar10"
