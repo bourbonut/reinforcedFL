@@ -4,3 +4,4 @@ numpy
 pygal
 rich-cli
 cairosvg
+tomli
