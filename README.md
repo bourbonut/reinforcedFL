@@ -61,33 +61,33 @@ Comments with `#` must be deleted.
 - In an `environment` file :
 ```
 {
-    "nexps": 20,	# number of experiments
-    "rounds": 10,	# number of rounds
-    "epochs": 3,	# number of epochs
-    "nworkers": 20,	# number of workers
-    "dataset": "MNIST"	# name of the dataset
+    "nexps": 20,	   # number of experiments
+    "rounds": 10,	   # number of rounds
+    "epochs": 3,	   # number of epochs
+    "nworkers": 20,	   # number of workers
+    "dataset": "MNIST" # name of the dataset
 }
 ```
 
 - In an `distribution` file :
 ```
 {
-    "label_distrb":"noniid",	# labels are non independent and identically distributed
-    "minlabels":3,		# there are at least 3 labels per worker
-    "volume_distrb":"noniid",	# volume of data is non independent and identically distributed
-    "balanced":true,		# True for "per worker" else each worker is a cluster of labels
-    "k":5			# coefficient for data augmentation (example MNIST : 60_000 x 5 = 300_000 samples)
+    "label_distrb": "noniid",  # labels are non independent and identically distributed
+    "minlabels": 3,		       # there are at least 3 labels per worker
+    "volume_distrb": "noniid", # volume of data is non independent and identically distributed
+    "balanced": true,		   # True for "per worker" else each worker is a cluster of labels
+    "k": 5			           # coefficient for data augmentation (example MNIST : 60_000 x 5 = 300_000 samples)
 }
 ```
 
 - In an `model` file :
 ```
 {
-  "worker_class": "Worker",		    # name of the worker class
-  "server_class": "FederatedAveraging",	    # name of the algorithm for aggregation
-  "scheduler_class": "RandomScheduler",	    # name of the scheduler class
-  "task_model": "mnist",		    # name of the task model for workers
-  "batch_size": 64			    # batch size
+  "worker_class": "Worker",		        # name of the worker class
+  "server_class": "FederatedAveraging",	# name of the algorithm for aggregation
+  "scheduler_class": "RandomScheduler",	# name of the scheduler class
+  "task_model": "mnist",		        # name of the task model for workers
+  "batch_size": 64			            # batch size
 }
 ```
 
