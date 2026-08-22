@@ -86,7 +86,7 @@ with Live(panel, auto_refresh=False) as live:
     texts.append(Align.center("[cyan]Opening the dataset[/]"))
     panel.renderable = Group(*texts)
     live.refresh()
-    datatrain, datatest = dataset(dataname)
+    datatrain, datatest = dataset(dataname, live, panel, texts)
     texts[-1] = Align.center("[green]Dataset opened.[/]")
     panel.renderable = Group(*texts)
     live.refresh()
@@ -104,12 +104,18 @@ with Live(panel, auto_refresh=False) as live:
     live.refresh()
     if not (wk_data_path.exists()) or REFRESH:
         exists = False
-        create(wk_data_path)
+        if created_path := create(wk_data_path):
+            texts.insert(len(texts) - 1, Align.center(f"{created_path} was created."))
+            panel.renderable = Group(*texts)
+            live.refresh()
         generate(
             wk_data_path,
             datatrain,
             datatest,
             NWORKERS,
+            live,
+            panel,
+            texts,
             save2png=True,
             **parameters["distribution"],
         )
@@ -126,7 +132,7 @@ with Live(panel, auto_refresh=False) as live:
 
     # Experiment path
     exp_path = iterate(EXP_PATH)
-    create(exp_path, verbose=False)
+    create(exp_path)
     # Save configuration
     with open(exp_path / "configuration.json", "w") as file:
         json.dump(parameters, file)
@@ -178,8 +184,8 @@ with Live(panel, auto_refresh=False) as live:
     live.refresh()
 
 # Create a directory
-create(exp_path / "agent", verbose=False)
-create(exp_path / "scheduler", verbose=False)
+create(exp_path / "agent")
+create(exp_path / "scheduler")
 
 # Panel
 console.print(Align.center(Markdown("## Experiments\n")))

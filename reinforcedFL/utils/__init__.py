@@ -5,6 +5,13 @@ Module for all functions useful for :
 - plotting
 """
 
+import contextlib
+import io
+
+from rich.align import Align
+from rich.console import Group
+from rich.live import Live
+from rich.panel import Panel
 from torchvision import datasets
 from torchvision.transforms import Compose, Normalize, ToTensor
 
@@ -40,7 +47,7 @@ def tracker(
     return "data-" + d + "-" + "".join((n, l, m, v)) + bb + k
 
 
-def dataset(name):
+def dataset(name: str, live: Live, panel: Panel, texts: list[Align]):
     path = DATA_PATH / name
     isavailable = path.exists()
     datasetfromtorch = hasattr(datasets, name)
@@ -48,9 +55,18 @@ def dataset(name):
     if isavailable or datasetfromtorch:
         transform = cifar10 if name == "CIFAR10" else ToTensor()
         loader = getattr(datasets, name)
-        datatrain = loader(
-            root="data", train=True, download=not (isavailable), transform=transform
-        )
+
+        if not isavailable:
+            texts[-1] = Align.center(f"[yellow]Downloading {name!r} dataset ...[/]")
+            panel.renderable = Group(*texts)
+            live.refresh()
+
+        captured_output = io.StringIO()
+        with contextlib.redirect_stdout(captured_output):
+            datatrain = loader(
+                root="data", train=True, download=not isavailable, transform=transform
+            )
+
         datatest = loader(root="data", train=False, transform=transform)
         return datatrain, datatest
     else:

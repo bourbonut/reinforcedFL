@@ -9,6 +9,10 @@ from functools import reduce
 from operator import add, itemgetter
 
 import torch
+from rich.align import Align
+from rich.console import Group
+from rich.live import Live
+from rich.panel import Panel
 
 from reinforcedFL.utils.distribution.common import sort_per_label
 from reinforcedFL.utils.plot import stacked
@@ -92,6 +96,9 @@ def generate(
     datatrain,
     datatest,
     nworkers,
+    live,
+    panel,
+    texts,
     label_distrb="iid",
     minlabels=3,
     balanced=False,
@@ -109,6 +116,9 @@ def generate(
         datatrain (Dataset):    dataset for training
         datatest (Dataset):     dataset for testing
         nworkers (int):         number of workers
+        live(Live):             used for displaying information in live
+        panel(Panel):           used as the layout of the live
+        texts(list[Align]):     current texts displayed in live
         label_distrb (str):     "iid" or "noniid"
         minlabels (int):        See function `label` in `utils/distribution/noniid.py`
         balanced (bool):        See function `label` in `utils/distribution/noniid.py`
@@ -181,7 +191,16 @@ def generate(
         name_file = "worker-" + str(k + 1) + ".pkl"
         with open(path / name_file, "wb") as file:
             pickle.dump(worker_data, file)
-        print("Data for worker {} saved".format(k + 1))
+
+        align = Align.center(
+            f"[yellow]Data for worker {k + 1} saved ({k + 1}/{nworkers})[/]"
+        )
+        if k == 0:
+            texts.insert(len(texts) - 1, align)
+        else:
+            texts[-2] = align
+        panel.renderable = Group(*texts)
+        live.refresh()
 
     if save2png:
         stacked(
