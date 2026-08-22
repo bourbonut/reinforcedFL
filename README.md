@@ -18,14 +18,18 @@ git clone https://github.com/bourbonut/reinforcedFL.git
 ```
 
 2. Then **create your own environment**.
-For instance, with `uv` :
+For instance, with `uv`:
 ```shell
 uv venv
-pip install -r requirements.txt -r pytorch-requirements.txt
+uv pip install -r requirements.txt
+uv pip install -r pytorch-requirements.txt
 ```
 
 > [!NOTE]
 > Check if the version of CUDA in `pytorch-requirements.txt` is compatible with your CUDA version (`nvidia-smi`).
+
+> [!WARNING]
+> On my machine, the total size of dependencies is `~4.5GB`.
 
 ## Usage
 
@@ -33,7 +37,7 @@ pip install -r requirements.txt -r pytorch-requirements.txt
 Three configurations files must be created to run a simulation. It is recommended to create the following tree:
 ```
 .
-├── ascii_sequential_execution.py
+├── main.py
 ├── ...
 └── configurations
     ├── environment
@@ -92,14 +96,14 @@ Comments with `#` must be deleted.
 
 Run the following command :
 ```shell
-python ascii_sequential_execution.py <path_env_conf> <path_distrb_file> <path_model_file>
+python main.py <path_env_conf> <path_distrb_file> <path_model_file>
 ```
 Add the flag `--cpu` to run on CPU and the flag `--refresh` to refresh the distribution of data if you need.
 By default, the program will choose the GPU if there is one, else it will run on CPU.
 
 For instance :
 ```shell
-python ascii_sequential_execution.py ./configurations/environment/env20.json ./configurations/distribution/iid.json ./configurations/model/fedavg.json --cpu --refresh
+python main.py ./configurations/environment/env20.json ./configurations/distribution/iid.json ./configurations/model/fedavg.json --cpu --refresh
 ```
 
 ### Results
