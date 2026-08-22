@@ -1,7 +1,7 @@
 import argparse
 import json
-from pathlib import Path
 
+import tomli
 import torch
 from rich.align import Align
 from rich.console import Console, Group
@@ -15,9 +15,12 @@ from reinforcedFL.core import aggregation, evaluate, participation, train, worke
 from reinforcedFL.utils import EXP_PATH, create, dataset, generate, iterate, tracker
 
 parser = argparse.ArgumentParser()
-parser.add_argument(dest="environment", help="environment path")
-parser.add_argument(dest="distribution", help="distribution path")
-parser.add_argument(dest="model", help="model path")
+parser.add_argument(dest="environment", help="environment config name")
+parser.add_argument(dest="distribution", help="distribution config name")
+parser.add_argument(dest="model", help="model config name")
+parser.add_argument(
+    "--config", default="./config.toml", dest="config", help="config file"
+)
 parser.add_argument(
     "--refresh", action="store_true", dest="refresh", help="Refresh data distribution"
 )
@@ -25,27 +28,28 @@ parser.add_argument("--cpu", action="store_false", dest="gpu", help="Run on CPU"
 args = parser.parse_args()
 
 # Introduction
-arguments = ["environment", "distribution", "model"]
-parameters = {key: None for key in arguments}
+SECTIONS = ["environment", "distribution", "model"]
+with open(args.config, "rb") as file:
+    config_params = tomli.load(file)
+parameters = {
+    section: config_params[section][getattr(args, section)] for section in SECTIONS
+}
 
 console = Console()
 console.print(Markdown("# Federated Reinforcement Learning"))
 
 panel = Panel("", title="Information")
 tables = []
+
 with Live(panel, auto_refresh=False) as live:
-    for argument in arguments:
-        path = Path(getattr(args, argument))
-        with open(path, "r") as file:
-            parameters[argument] = json.load(file)
-        table = Table(title=argument + " information")
-        for element in parameters[argument]:
+    for section, config_dict in parameters.items():
+        table = Table(title=f"{section} information")
+        for element in config_dict:
             table.add_column(element)
-        table.add_row(*map(str, parameters[argument].values()))
-        align = Align.center(table)
-        tables.append(align)
-        panel.renderable = Group(*tables)
-        live.refresh()
+        table.add_row(*map(str, config_dict.values()))
+        tables.append(Align.center(table))
+    panel.renderable = Group(*tables)
+    live.refresh()
 
 NEXPS = parameters["environment"].get("nexps", 1)
 ROUNDS = parameters["environment"]["rounds"]
