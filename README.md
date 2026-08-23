@@ -1,6 +1,6 @@
 # Federated Reinforcement Learning
 
-![example](./docs/example.png)
+![example](./assets/example.png)
 
 > [!WARNING]
 > The code has been updated in order to use modern tools such as [uv](https://docs.astral.sh/uv/) and make it more accessible with the lastest python versions.
@@ -104,14 +104,14 @@ print(data)
 
 ## Report
 
-The [report](./docs/report.pdf) summarizes :
+The [report](./report.pdf) summarizes :
 1. A state of art of Federated Learning focused on Reinforcement Learning
 2. More details on algorithms implemented
 3. Results of several experiments
 
 <p align="center">
-    <a href="./docs/report.pdf">
-        <img width=300px src="./docs/report.png"/>
+    <a href="./report.pdf">
+        <img width=300px src="./assets/report.png"/>
     </a>
 </p>
 
